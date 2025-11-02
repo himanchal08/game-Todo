@@ -11,12 +11,14 @@ import taskRoutes from "./routes/taskRoutes";
 import xpRoutes from "./routes/xpRoutes";
 import streakRoutes from "./routes/streakRoutes";
 import proofRoutes from "./routes/proofRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
 
 // Import middleware
 import { errorHandler } from "./middlewares/errorMiddleware";
 
 // Import utilities
 import { startCleanupSchedule } from "./utils/cleanup";
+import { startNotificationSchedulers } from "./services/schedulerService";
 
 dotenv.config();
 
@@ -42,6 +44,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/xp", xpRoutes);
 app.use("/api/streaks", streakRoutes);
 app.use("/api/proofs", proofRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -53,4 +56,7 @@ app.listen(PORT, () => {
 
   // Start cleanup scheduler
   startCleanupSchedule();
+
+  // Start notification schedulers
+  startNotificationSchedulers();
 });
