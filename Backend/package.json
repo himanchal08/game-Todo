@@ -14,12 +14,16 @@
   "type": "commonjs",
   "dependencies": {
     "@supabase/supabase-js": "^2.77.0",
+    "@types/multer": "^2.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-validator": "^7.3.0",
     "helmet": "^8.1.0",
-    "morgan": "^1.10.1"
+    "imghash": "^1.1.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "sharp": "^0.34.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
