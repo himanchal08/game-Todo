@@ -12,6 +12,7 @@ import xpRoutes from "./routes/xpRoutes";
 import streakRoutes from "./routes/streakRoutes";
 import proofRoutes from "./routes/proofRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
+import analyticsRoutes from "./routes/analyticsRoutes";
 
 // Import middleware
 import { errorHandler } from "./middlewares/errorMiddleware";
@@ -45,6 +46,7 @@ app.use("/api/xp", xpRoutes);
 app.use("/api/streaks", streakRoutes);
 app.use("/api/proofs", proofRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);

@@ -1,6 +1,8 @@
-import { Response } from 'express';
-import { supabase } from '../config/supabase';
-import { AuthRequest } from '../middlewares/authMiddleware';
+import { Response } from "express";
+import { supabase } from "../config/supabase";
+import { AuthRequest } from "../middlewares/authMiddleware";
+import { logUserActivity } from "../services/analyticsService";
+import { checkAndAwardBadges } from "../services/badgeService";
 
 export const createTask = async (req: AuthRequest, res: Response) => {
   try {
@@ -8,7 +10,7 @@ export const createTask = async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
 
     const { data, error } = await supabase
-      .from('tasks')
+      .from("tasks")
       .insert({
         habit_id: habitId,
         user_id: userId,
@@ -33,14 +35,14 @@ export const createTask = async (req: AuthRequest, res: Response) => {
 export const getTodayTasks = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
 
     const { data, error } = await supabase
-      .from('tasks')
-      .select('*, habits(title, color)')
-      .eq('user_id', userId)
-      .eq('due_date', today)
-      .order('created_at', { ascending: true });
+      .from("tasks")
+      .select("*, habits(title, color)")
+      .eq("user_id", userId)
+      .eq("due_date", today)
+      .order("created_at", { ascending: true });
 
     if (error) {
       return res.status(400).json({ error: error.message });
@@ -59,70 +61,70 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
 
     // Get task details
     const { data: task, error: taskError } = await supabase
-      .from('tasks')
-      .select('*, habits(id)')
-      .eq('id', id)
-      .eq('user_id', userId)
+      .from("tasks")
+      .select("*, habits(id)")
+      .eq("id", id)
+      .eq("user_id", userId)
       .single();
 
     if (taskError || !task) {
-      return res.status(404).json({ error: 'Task not found' });
+      return res.status(404).json({ error: "Task not found" });
     }
 
     if (task.is_completed) {
-      return res.status(400).json({ error: 'Task already completed' });
+      return res.status(400).json({ error: "Task already completed" });
     }
 
     // Mark task as complete
     const { error: updateError } = await supabase
-      .from('tasks')
+      .from("tasks")
       .update({
         is_completed: true,
         completed_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq("id", id);
 
     if (updateError) {
       return res.status(400).json({ error: updateError.message });
     }
 
     // Award XP
-    await supabase.from('xp_logs').insert({
+    await supabase.from("xp_logs").insert({
       user_id: userId,
       task_id: id,
       amount: task.xp_reward,
-      reason: 'Task completion',
+      reason: "Task completion",
     });
 
     // Update total XP in profile
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('total_xp')
-      .eq('id', userId)
+      .from("profiles")
+      .select("total_xp")
+      .eq("id", userId)
       .single();
 
     const newTotalXp = (profile?.total_xp || 0) + task.xp_reward;
     const newLevel = Math.floor(newTotalXp / 100) + 1; // 100 XP per level
 
     await supabase
-      .from('profiles')
+      .from("profiles")
       .update({ total_xp: newTotalXp, level: newLevel })
-      .eq('id', userId);
+      .eq("id", userId);
 
     // Update streak
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     const { data: streak } = await supabase
-      .from('streaks')
-      .select('*')
-      .eq('habit_id', task.habit_id)
-      .eq('user_id', userId)
+      .from("streaks")
+      .select("*")
+      .eq("habit_id", task.habit_id)
+      .eq("user_id", userId)
       .single();
 
     if (streak) {
       const lastDate = streak.last_completed_date;
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
 
       let newStreak = streak.current_streak;
 
@@ -140,20 +142,28 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
       const newLongest = Math.max(newStreak, streak.longest_streak);
 
       await supabase
-        .from('streaks')
+        .from("streaks")
         .update({
           current_streak: newStreak,
           longest_streak: newLongest,
           last_completed_date: today,
         })
-        .eq('id', streak.id);
+        .eq("id", streak.id);
     }
 
+    // Log activity for analytics
+    await logUserActivity(userId!, "task", 1);
+    await logUserActivity(userId!, "xp", task.xp_reward);
+
+    // Check for new badges
+    const newBadges = await checkAndAwardBadges(userId!);
+
     res.json({
-      message: 'Task completed!',
+      message: "Task completed!",
       xpAwarded: task.xp_reward,
       newTotalXp,
       newLevel,
+      newBadges: newBadges.length > 0 ? newBadges : undefined,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -166,11 +176,11 @@ export const getTasksByHabit = async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
 
     const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('habit_id', habitId)
-      .eq('user_id', userId)
-      .order('due_date', { ascending: false });
+      .from("tasks")
+      .select("*")
+      .eq("habit_id", habitId)
+      .eq("user_id", userId)
+      .order("due_date", { ascending: false });
 
     if (error) {
       return res.status(400).json({ error: error.message });
