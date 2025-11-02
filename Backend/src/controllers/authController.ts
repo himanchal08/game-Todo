@@ -134,3 +134,38 @@ export const getProfile = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const createProfile = async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(" ")[1];
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser(token);
+
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Use admin client to bypass RLS
+    const { data: profile, error } = await supabaseAdmin
+      .from("profiles")
+      .insert({
+        id: user.id,
+        ...req.body,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Profile creation error:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(201).json({ profile });
+  } catch (error: any) {
+    console.error("Profile creation error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
