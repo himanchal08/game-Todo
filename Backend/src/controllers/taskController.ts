@@ -114,6 +114,8 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
       user_id: userId,
       task_id: id,
       amount: task.xp_reward,
+      source: "task_completion",
+      description: `Completed: ${task.title}`,
       reason: "Task completion",
     });
 

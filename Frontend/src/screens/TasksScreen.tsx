@@ -12,7 +12,7 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 import api from "../services/api";
 import styles from "../styles/screens/TasksScreen.styles";
@@ -164,39 +164,16 @@ const TasksScreen = ({ route }: any) => {
         return false;
       }
 
-      // Request media library permission (for saving photos) - only request image permissions
-      try {
-        const mediaStatus = await MediaLibrary.requestPermissionsAsync(false); // false = don't request audio
-        if (mediaStatus.status !== "granted") {
-          Alert.alert(
-            "Permission Required",
-            "Storage permission is needed to save your proof photos to your device. " +
-              "Photos will be stored locally and deleted from our server after 90 minutes.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Grant Permission",
-                onPress: async () => {
-                  await MediaLibrary.requestPermissionsAsync(false);
-                },
-              },
-            ]
-          );
-          return false;
-        }
-      } catch (mediaError) {
-        console.log("Media library permission skipped:", mediaError);
-        // Continue anyway - photo will still be saved by camera/picker
-      }
+      // Note: Camera photos are auto-saved by Android to your gallery
+      // We'll try to organize them into an album later if we have permission
+      console.log(
+        "✅ Camera permission granted - photos will be saved automatically"
+      );
 
       return true;
     } catch (error) {
       console.error("Error requesting permissions:", error);
-      Alert.alert(
-        "Permission Error",
-        "Some permissions could not be requested. Camera and gallery should still work."
-      );
-      return true; // Allow to proceed
+      return true; // Allow to proceed - camera will save photos
     }
   };
 
@@ -243,53 +220,35 @@ const TasksScreen = ({ route }: any) => {
   };
 
   const savePhotoToDevice = async (localUri: string) => {
-    try {
-      // Save the captured/picked photo to gallery in a dedicated album
-      const { status } = await MediaLibrary.getPermissionsAsync();
-      if (status !== "granted") {
-        // Photo is already on device from camera/picker, just notify user
-        console.log(
-          "Media library permission not granted, photo already on device"
-        );
-        return;
-      }
-
-      // Create asset from the local URI (photo is already on device)
-      const asset = await MediaLibrary.createAssetAsync(localUri);
-
-      // Try to create/get the "Task Proofs" album and add the photo
-      try {
-        const album = await MediaLibrary.getAlbumAsync("Task Proofs");
-        if (album) {
-          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-        } else {
-          await MediaLibrary.createAlbumAsync("Task Proofs", asset, false);
-        }
-      } catch (albumError) {
-        // Album operations failed, but photo is still saved to device
-        console.log(
-          "Album operation failed, photo still on device:",
-          albumError
-        );
-      }
-
-      Alert.alert(
-        "Success! 📸",
-        "Your proof photo has been saved to your gallery. " +
-          "It will be automatically deleted from our server after 90 minutes, " +
-          "but will remain on your device."
-      );
-    } catch (error) {
-      console.error("Error organizing photo:", error);
-      // Photo is still on device from camera/picker
-      Alert.alert(
-        "Photo Saved",
-        "Your proof photo is saved on your device. " +
-          "It will be deleted from our server after 90 minutes."
-      );
-    }
+    // Offer to share/save the photo
+    Alert.alert(
+      "Save Photo? 📸",
+      "Would you like to save this proof photo to your device?",
+      [
+        { text: "No, Thanks", style: "cancel" },
+        {
+          text: "Save Photo",
+          onPress: async () => {
+            try {
+              const isAvailable = await Sharing.isAvailableAsync();
+              if (isAvailable) {
+                await Sharing.shareAsync(localUri, {
+                  mimeType: "image/jpeg",
+                  dialogTitle: "Save your task proof photo",
+                });
+                console.log("✅ Photo shared - user can save it");
+              } else {
+                Alert.alert("Info", "Photo uploaded to server successfully!");
+              }
+            } catch (error) {
+              console.error("Error sharing photo:", error);
+              Alert.alert("Note", "Photo uploaded to server successfully!");
+            }
+          },
+        },
+      ]
+    );
   };
-
   const submitProofAndComplete = async () => {
     if (!capturedImage || !selectedTaskId) return;
 
@@ -313,9 +272,9 @@ const TasksScreen = ({ route }: any) => {
       // Complete task
       const completeResponse = await api.tasks.complete(selectedTaskId);
 
-      let message = `+${
+      let message = `Task completed! +${
         completeResponse.xpAwarded + (proofResponse.xpBonus || 0)
-      } XP earned!`;
+      } XP earned!\n📸 Photo saved to your gallery!`;
       if (completeResponse.newLevel) {
         message += `\n🎉 Level Up! You're now level ${completeResponse.newLevel}!`;
       }

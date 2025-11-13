@@ -138,6 +138,8 @@ export const recoverStreak = async (req: AuthRequest, res: Response) => {
     await supabaseAdmin.from("xp_logs").insert({
       user_id: userId,
       amount: -xpPenalty,
+      source: "streak_recovery",
+      description: `Recovered streak for "${streak.habits.title}"`,
       reason: `Streak recovery for "${streak.habits.title}"`,
     });
 

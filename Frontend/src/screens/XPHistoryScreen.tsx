@@ -48,6 +48,7 @@ const XPHistoryScreen = () => {
   }, []);
 
   const getSourceIcon = (source: string) => {
+    if (!source) return "⭐";
     switch (source) {
       case "task_completion":
         return "✅";
@@ -67,6 +68,7 @@ const XPHistoryScreen = () => {
   };
 
   const getSourceColor = (source: string) => {
+    if (!source) return "#6B7280";
     switch (source) {
       case "task_completion":
         return "#3B82F6";
@@ -108,6 +110,9 @@ const XPHistoryScreen = () => {
   };
 
   const formatSourceName = (source: string) => {
+    if (!source || typeof source !== "string") {
+      return "Unknown";
+    }
     return source
       .split("_")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

@@ -6,10 +6,10 @@ export const getXPHistory = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
 
-    // Use admin client to bypass RLS
+    // Use admin client to bypass RLS - fetch with task details
     const { data, error } = await supabaseAdmin
       .from("xp_logs")
-      .select("*")
+      .select("*, tasks(title, description)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -19,8 +19,27 @@ export const getXPHistory = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
 
+    // Enrich data with better descriptions
+    const enrichedData = data?.map((log: any) => {
+      // If we have a task title, use it
+      if (log.tasks?.title) {
+        return {
+          ...log,
+          description: `${log.tasks.title}`,
+          source: log.source || "task_completion",
+        };
+      }
+
+      // Otherwise use existing description or reason
+      return {
+        ...log,
+        description: log.description || log.reason || "XP earned",
+        source: log.source || "bonus",
+      };
+    });
+
     // Frontend expects { history: data }
-    res.json({ history: data });
+    res.json({ history: enrichedData });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

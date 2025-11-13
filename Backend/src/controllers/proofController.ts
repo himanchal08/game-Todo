@@ -164,6 +164,8 @@ export const uploadProof = async (req: AuthRequest, res: Response) => {
       user_id: userId,
       task_id: taskId,
       amount: xpBonus,
+      source: "bonus",
+      description: `Photo proof bonus (${frameType} frame)`,
       reason: `Photo proof bonus (${frameType} frame)`,
     });
 

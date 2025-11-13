@@ -1,12 +1,17 @@
 {
   "expo": {
-    "name": "Frontend",
-    "slug": "Frontend",
+    "name": "GameTodo",
+    "slug": "game-todo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "not-required-for-dev"
+      }
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,18 +19,11 @@
     },
     "ios": {
       "infoPlist": {
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
-      "permissions": [
-        "NOTIFICATIONS",
-        "VIBRATE",
-        "NOTIFICATIONS",
-        "VIBRATE"
-      ],
+      "permissions": ["NOTIFICATIONS", "VIBRATE", "NOTIFICATIONS", "VIBRATE"],
       "package": "com.anonymous.Frontend"
     },
     "plugins": [
@@ -34,6 +32,21 @@
         {
           "icon": "./assets/icon.png",
           "color": "#ffffff"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to save your task proof photos.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to upload task proofs.",
+          "cameraPermission": "The app needs access to your camera to take task proof photos."
         }
       ]
     ],

@@ -52,28 +52,12 @@ const HomeScreen = () => {
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    try {
-      const response = await api.tasks.complete(taskId);
-
-      // Show success message with XP and badges
-      let message = `Task completed! +${response.xpAwarded} XP`;
-      if (response.newLevel) {
-        message += `\n🎉 Level Up! You're now level ${response.newLevel}!`;
-      }
-      if (response.newBadges && response.newBadges.length > 0) {
-        message += `\n🏆 New Badge${
-          response.newBadges.length > 1 ? "s" : ""
-        }: ${response.newBadges.map((b: any) => b.name).join(", ")}`;
-      }
-
-      Alert.alert("Success", message);
-
-      // Refresh data
-      await Promise.all([fetchTodayTasks(), fetchProfile()]);
-    } catch (error: any) {
-      console.error("Error completing task:", error);
-      Alert.alert("Error", error.message || "Failed to complete task");
-    }
+    // Photo verification is mandatory - redirect to Tasks screen
+    Alert.alert(
+      "Photo Proof Required 📸",
+      "To complete this task, you need to take a proof photo. This helps verify your progress!\n\nPlease go to the Tasks screen to complete this task with photo proof.",
+      [{ text: "OK", style: "default" }]
+    );
   };
 
   const handleClearCompleted = async () => {
