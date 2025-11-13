@@ -49,7 +49,8 @@ export const getStats = async (req: AuthRequest, res: Response) => {
       return res.status(500).json({ error: "Failed to get statistics" });
     }
 
-    res.json({ statistics: stats });
+    // Return stats directly (frontend expects them at top level)
+    res.json(stats);
   } catch (error: any) {
     console.error("Get stats error:", error);
     res.status(500).json({ error: error.message });

@@ -17,7 +17,8 @@ interface Profile {
   username: string;
   email: string;
   level: number;
-  xp: number;
+  total_xp: number;
+  full_name?: string;
 }
 
 interface Stats {
@@ -134,8 +135,12 @@ const ProfileScreen = ({ navigation }: any) => {
     >
       <View style={styles.header}>
         <View style={styles.profileInfo}>
-          <Text style={styles.name}>{profile?.username || "User"}</Text>
-          <Text style={styles.username}>{profile?.email}</Text>
+          <Text style={styles.name}>
+            {profile?.full_name || profile?.username || "User"}
+          </Text>
+          {profile?.username && (
+            <Text style={styles.username}>@{profile.username}</Text>
+          )}
         </View>
       </View>
 
@@ -175,7 +180,7 @@ const ProfileScreen = ({ navigation }: any) => {
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>
-              {stats?.total_xp || profile?.xp || 0}
+              {stats?.total_xp || profile?.total_xp || 0}
             </Text>
             <Text style={styles.statLabel}>Total XP</Text>
           </View>

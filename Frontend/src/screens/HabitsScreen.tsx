@@ -29,7 +29,7 @@ interface Streak {
   last_completed: string;
 }
 
-const HabitsScreen = () => {
+const HabitsScreen = ({ navigation }: any) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [streaks, setStreaks] = useState<Streak[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -126,12 +126,18 @@ const HabitsScreen = () => {
         {habits.map((habit) => {
           const streak = getStreakForHabit(habit.id);
           return (
-            <View
+            <TouchableOpacity
               key={habit.id}
               style={[styles.habitCard, { borderLeftColor: "#3B82F6" }]}
+              onPress={() =>
+                navigation.navigate("Tasks", {
+                  habitId: habit.id,
+                  habitName: habit.title,
+                })
+              }
             >
               <View style={styles.habitHeader}>
-                <Text style={styles.habitTitle}>{habit.name}</Text>
+                <Text style={styles.habitTitle}>{habit.title}</Text>
                 <View style={styles.streakBadge}>
                   <Text style={styles.streakText}>
                     🔥 {streak?.current_streak || 0}
@@ -147,7 +153,17 @@ const HabitsScreen = () => {
                   Best: {streak?.longest_streak || 0} days
                 </Text>
               </View>
-            </View>
+              <Text
+                style={{
+                  color: "#3B82F6",
+                  fontSize: 12,
+                  marginTop: 8,
+                  fontWeight: "600",
+                }}
+              >
+                Tap to view tasks →
+              </Text>
+            </TouchableOpacity>
           );
         })}
         {habits.length === 0 && (

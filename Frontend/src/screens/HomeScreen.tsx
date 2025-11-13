@@ -21,8 +21,9 @@ interface Task {
 
 interface Profile {
   level: number;
-  xp: number;
+  total_xp: number;
   username: string;
+  full_name?: string;
 }
 
 const HomeScreen = () => {
@@ -75,6 +76,45 @@ const HomeScreen = () => {
     }
   };
 
+  const handleClearCompleted = async () => {
+    const completedCount = tasks.filter((t) => t.is_completed).length;
+
+    if (completedCount === 0) {
+      Alert.alert(
+        "No Completed Tasks",
+        "There are no completed tasks to clear."
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Clear Completed Tasks",
+      `Are you sure you want to delete ${completedCount} completed task${
+        completedCount > 1 ? "s" : ""
+      }? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.tasks.deleteCompleted();
+              await fetchTodayTasks();
+              Alert.alert("Success", "Completed tasks deleted successfully!");
+            } catch (error: any) {
+              console.error("Error deleting completed tasks:", error);
+              Alert.alert(
+                "Error",
+                error.message || "Failed to delete completed tasks"
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchTodayTasks(), fetchProfile()]);
@@ -88,14 +128,16 @@ const HomeScreen = () => {
 
   const calculateLevelProgress = () => {
     if (!profile) return 0;
-    return ((profile.xp % 100) / 100) * 100; // 100 XP per level
+    return ((profile.total_xp % 100) / 100) * 100; // 100 XP per level
   };
 
   return (
     <View style={styles.container}>
       {profile && (
         <View style={styles.profileCard}>
-          <Text style={styles.welcomeText}>Welcome, {profile.username}!</Text>
+          <Text style={styles.welcomeText}>
+            Welcome, {profile.full_name || profile.username || "User"}!
+          </Text>
           <View style={styles.levelContainer}>
             <Text style={styles.levelText}>Level {profile.level}</Text>
             <View style={styles.progressBar}>
@@ -106,12 +148,30 @@ const HomeScreen = () => {
                 ]}
               />
             </View>
-            <Text style={styles.xpText}>{profile.xp} XP</Text>
+            <Text style={styles.xpText}>{profile.total_xp} XP</Text>
           </View>
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Today's Tasks</Text>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          marginTop: 10,
+        }}
+      >
+        <Text style={styles.sectionTitle}>Today's Tasks</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: "#EF4444", padding: 10, borderRadius: 8 }}
+          onPress={handleClearCompleted}
+        >
+          <Text style={{ color: "white", fontWeight: "600" }}>
+            🗑️ Clear Done
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         style={styles.taskList}
@@ -123,8 +183,8 @@ const HomeScreen = () => {
           <TouchableOpacity
             key={task.id}
             style={[styles.taskCard, { borderLeftColor: "#3B82F6" }]}
-            onPress={() => !task.completed && handleCompleteTask(task.id)}
-            disabled={task.completed}
+            onPress={() => !task.is_completed && handleCompleteTask(task.id)}
+            disabled={task.is_completed}
           >
             <View style={styles.taskHeader}>
               <Text style={styles.taskTitle}>{task.title}</Text>
@@ -133,7 +193,7 @@ const HomeScreen = () => {
             {task.description && (
               <Text style={styles.taskDescription}>{task.description}</Text>
             )}
-            {task.completed && (
+            {task.is_completed && (
               <View style={styles.completedBadge}>
                 <Text style={styles.completedText}>✓ Completed</Text>
               </View>

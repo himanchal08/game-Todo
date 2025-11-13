@@ -25,7 +25,7 @@ import { startProofCleanupScheduler } from "./services/proofCleanupService";
 dotenv.config();
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Middlewares
 app.use(cors());
@@ -52,9 +52,11 @@ app.use("/api/analytics", analyticsRoutes);
 // Error handler (must be last)
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+// Start server - Listen on all network interfaces (0.0.0.0)
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on:`);
+  console.log(`   - Local:   http://localhost:${PORT}`);
+  console.log(`   - Network: http://192.168.1.11:${PORT}`);
   console.log(`📚 API Docs: http://localhost:${PORT}/health`);
 
   // Start cleanup scheduler

@@ -174,15 +174,8 @@ export const getNotificationHistory = async (
     const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    const userSupabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_ANON_KEY!,
-      {
-        global: { headers: { Authorization: `Bearer ${req.accessToken}` } },
-      }
-    );
-
-    const { data, error } = await userSupabase
+    // Use admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from("notification_history")
       .select("*")
       .eq("user_id", userId)
@@ -190,6 +183,7 @@ export const getNotificationHistory = async (
       .limit(limit);
 
     if (error) {
+      console.error("Get notification history error:", error);
       return res.status(400).json({ error: error.message });
     }
 
@@ -222,6 +216,105 @@ export const markAsRead = async (req: AuthRequest, res: Response) => {
 
     res.json({ message: "Notification marked as read" });
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Mark all notifications as read
+ */
+export const markAllAsRead = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    const { error } = await supabaseAdmin
+      .from("notification_history")
+      .update({
+        is_read: true,
+        opened_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("is_read", false);
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ message: "All notifications marked as read" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Delete notification
+ */
+export const deleteNotification = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const { error } = await supabaseAdmin
+      .from("notification_history")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ message: "Notification deleted" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Send test motivational notification
+ */
+export const sendTestMotivation = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id!;
+    const {
+      getRandomMessage,
+      morningMotivation,
+      midDayBoost,
+      eveningReflection,
+      encouragementMessages,
+    } = require("../services/motivationalMessages");
+    const {
+      sendMotivationalMessage,
+    } = require("../services/notificationService");
+
+    const hour = new Date().getHours();
+    let message: string;
+    let title: string;
+
+    // Send message based on current time
+    if (hour >= 5 && hour < 12) {
+      message = getRandomMessage(morningMotivation);
+      title = "☀️ Good Morning!";
+    } else if (hour >= 12 && hour < 17) {
+      message = getRandomMessage(midDayBoost);
+      title = "⚡ Midday Boost!";
+    } else if (hour >= 17 && hour < 22) {
+      message = getRandomMessage(eveningReflection);
+      title = "🌙 Evening Check-in";
+    } else {
+      message = getRandomMessage(encouragementMessages);
+      title = "💪 Stay Motivated!";
+    }
+
+    const result = await sendMotivationalMessage(userId, message, title);
+
+    res.json({
+      message: "Test notification sent!",
+      notification: { title, body: message },
+      result,
+    });
+  } catch (error: any) {
+    console.error("Send test motivation error:", error);
     res.status(500).json({ error: error.message });
   }
 };

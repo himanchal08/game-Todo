@@ -91,7 +91,9 @@ export const authAPI = {
       throw new Error(error.error || "Failed to fetch profile");
     }
 
-    return response.json();
+    const data = await response.json();
+    // Backend returns { profile: {...} }, extract the profile object
+    return data.profile || data;
   },
 
   updateProfile: async (data: { username?: string; avatar_url?: string }) => {
@@ -248,6 +250,19 @@ export const tasksAPI = {
 
     return response.json();
   },
+
+  deleteCompleted: async () => {
+    const response = await authenticatedFetch("/api/tasks/completed", {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to delete completed tasks");
+    }
+
+    return response.json();
+  },
 };
 
 // ============================================
@@ -319,7 +334,7 @@ export const proofsAPI = {
     }
 
     const formData = new FormData();
-    formData.append("task_id", taskId);
+    formData.append("taskId", taskId); // Changed from task_id to taskId
 
     // For React Native, format the image properly
     const uriParts = imageUri.split(".");
@@ -331,6 +346,8 @@ export const proofsAPI = {
       type: `image/${fileType}`,
     } as any);
 
+    console.log("Uploading proof:", { taskId, imageUri, fileType });
+
     const response = await fetch(`${API_URL}/api/proofs/upload`, {
       method: "POST",
       headers: {
@@ -340,8 +357,11 @@ export const proofsAPI = {
       body: formData,
     });
 
+    console.log("Upload response status:", response.status);
+
     if (!response.ok) {
       const error = await response.json();
+      console.error("Upload error:", error);
       throw new Error(error.error || "Failed to upload proof");
     }
 
@@ -399,10 +419,18 @@ export const proofsAPI = {
 // NOTIFICATIONS APIs
 // ============================================
 export const notificationsAPI = {
-  registerToken: async (pushToken: string) => {
+  registerToken: async (
+    pushToken: string,
+    platform: string = "ios",
+    deviceName?: string
+  ) => {
     const response = await authenticatedFetch("/api/notifications/token", {
       method: "POST",
-      body: JSON.stringify({ push_token: pushToken }),
+      body: JSON.stringify({
+        token: pushToken,
+        platform,
+        deviceName: deviceName || "Unknown Device",
+      }),
     });
 
     if (!response.ok) {
@@ -520,6 +548,22 @@ export const notificationsAPI = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || "Failed to delete notification");
+    }
+
+    return response.json();
+  },
+
+  testMotivation: async () => {
+    const response = await authenticatedFetch(
+      "/api/notifications/test-motivation",
+      {
+        method: "POST",
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to send test notification");
     }
 
     return response.json();

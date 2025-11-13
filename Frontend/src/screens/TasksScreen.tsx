@@ -23,6 +23,7 @@ interface Task {
   description: string;
   scheduled_for: string;
   completed: boolean;
+  is_completed: boolean;
   xp_reward: number;
   habit_id?: string; // Optional - tasks can be standalone or under habits
 }
@@ -30,10 +31,11 @@ interface Task {
 interface Habit {
   id: string;
   name: string;
+  title: string;
   frequency: string;
 }
 
-const TasksScreen = () => {
+const TasksScreen = ({ route }: any) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -41,10 +43,13 @@ const TasksScreen = () => {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [selectedHabitFilter, setSelectedHabitFilter] = useState<string | null>(
+    route?.params?.habitId || null
+  );
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
-    habitId: "",
+    habitId: route?.params?.habitId || "",
     scheduledFor: new Date().toISOString().split("T")[0],
     xpReward: "50",
   });
@@ -159,30 +164,39 @@ const TasksScreen = () => {
         return false;
       }
 
-      // Request media library permission (for saving photos)
-      const mediaStatus = await MediaLibrary.requestPermissionsAsync();
-      if (mediaStatus.status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Storage permission is needed to save your proof photos to your device. " +
-            "Photos will be stored locally and deleted from our server after 90 minutes.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Grant Permission",
-              onPress: async () => {
-                await MediaLibrary.requestPermissionsAsync();
+      // Request media library permission (for saving photos) - only request image permissions
+      try {
+        const mediaStatus = await MediaLibrary.requestPermissionsAsync(false); // false = don't request audio
+        if (mediaStatus.status !== "granted") {
+          Alert.alert(
+            "Permission Required",
+            "Storage permission is needed to save your proof photos to your device. " +
+              "Photos will be stored locally and deleted from our server after 90 minutes.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Grant Permission",
+                onPress: async () => {
+                  await MediaLibrary.requestPermissionsAsync(false);
+                },
               },
-            },
-          ]
-        );
-        return false;
+            ]
+          );
+          return false;
+        }
+      } catch (mediaError) {
+        console.log("Media library permission skipped:", mediaError);
+        // Continue anyway - photo will still be saved by camera/picker
       }
 
       return true;
     } catch (error) {
       console.error("Error requesting permissions:", error);
-      return false;
+      Alert.alert(
+        "Permission Error",
+        "Some permissions could not be requested. Camera and gallery should still work."
+      );
+      return true; // Allow to proceed
     }
   };
 
@@ -327,6 +341,45 @@ const TasksScreen = () => {
     }
   };
 
+  const handleClearCompleted = async () => {
+    const completedCount = tasks.filter((t) => t.is_completed).length;
+
+    if (completedCount === 0) {
+      Alert.alert(
+        "No Completed Tasks",
+        "There are no completed tasks to clear."
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Clear Completed Tasks",
+      `Are you sure you want to delete ${completedCount} completed task${
+        completedCount > 1 ? "s" : ""
+      }? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.tasks.deleteCompleted();
+              await fetchTasks();
+              Alert.alert("Success", "Completed tasks deleted successfully!");
+            } catch (error: any) {
+              console.error("Error deleting completed tasks:", error);
+              Alert.alert(
+                "Error",
+                error.message || "Failed to delete completed tasks"
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchTasks(), fetchHabits()]);
@@ -339,14 +392,22 @@ const TasksScreen = () => {
   }, []);
 
   const groupTasksByDate = () => {
-    const grouped = tasks.reduce((acc: { [key: string]: Task[] }, task) => {
-      const date = task.scheduled_for;
-      if (!acc[date]) {
-        acc[date] = [];
-      }
-      acc[date].push(task);
-      return acc;
-    }, {});
+    // Filter by selected habit if one is selected
+    const filteredTasks = selectedHabitFilter
+      ? tasks.filter((t) => t.habit_id === selectedHabitFilter)
+      : tasks;
+
+    const grouped = filteredTasks.reduce(
+      (acc: { [key: string]: Task[] }, task) => {
+        const date = task.scheduled_for;
+        if (!acc[date]) {
+          acc[date] = [];
+        }
+        acc[date].push(task);
+        return acc;
+      },
+      {}
+    );
 
     return Object.entries(grouped).sort(([dateA], [dateB]) =>
       dateA.localeCompare(dateB)
@@ -356,14 +417,83 @@ const TasksScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Tasks</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
+        <View>
+          <Text style={styles.title}>Tasks</Text>
+          {route?.params?.habitName && (
+            <Text style={{ fontSize: 14, color: "#6B7280", marginTop: 4 }}>
+              for {route.params.habitName}
+            </Text>
+          )}
+        </View>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: "#EF4444" }]}
+            onPress={handleClearCompleted}
+          >
+            <Text style={styles.addButtonText}>🗑️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setModalVisible(true)}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Habit Filter */}
+      <ScrollView
+        horizontal
+        style={{ maxHeight: 50, marginBottom: 10 }}
+        showsHorizontalScrollIndicator={false}
+      >
+        <TouchableOpacity
+          style={[
+            {
+              padding: 8,
+              paddingHorizontal: 16,
+              margin: 5,
+              borderRadius: 20,
+              backgroundColor: !selectedHabitFilter ? "#3B82F6" : "#E5E7EB",
+            },
+          ]}
+          onPress={() => setSelectedHabitFilter(null)}
+        >
+          <Text
+            style={{
+              color: !selectedHabitFilter ? "white" : "#6B7280",
+              fontWeight: "600",
+            }}
+          >
+            All Tasks
+          </Text>
+        </TouchableOpacity>
+        {habits.map((habit) => (
+          <TouchableOpacity
+            key={habit.id}
+            style={[
+              {
+                padding: 8,
+                paddingHorizontal: 16,
+                margin: 5,
+                borderRadius: 20,
+                backgroundColor:
+                  selectedHabitFilter === habit.id ? "#3B82F6" : "#E5E7EB",
+              },
+            ]}
+            onPress={() => setSelectedHabitFilter(habit.id)}
+          >
+            <Text
+              style={{
+                color: selectedHabitFilter === habit.id ? "white" : "#6B7280",
+                fontWeight: "600",
+              }}
+            >
+              {habit.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       <ScrollView
         style={styles.taskList}
@@ -377,15 +507,20 @@ const TasksScreen = () => {
             {dateTasks.map((task) => (
               <TouchableOpacity
                 key={task.id}
-                style={[styles.taskCard, { opacity: task.completed ? 0.6 : 1 }]}
-                onPress={() => !task.completed && handleCompleteTask(task.id)}
-                disabled={task.completed}
+                style={[
+                  styles.taskCard,
+                  { opacity: task.is_completed ? 0.6 : 1 },
+                ]}
+                onPress={() =>
+                  !task.is_completed && handleCompleteTask(task.id)
+                }
+                disabled={task.is_completed}
               >
                 <View style={styles.taskHeader}>
                   <Text
                     style={[
                       styles.taskTitle,
-                      task.completed && styles.completedText,
+                      task.is_completed && styles.completedText,
                     ]}
                   >
                     {task.title}
@@ -395,9 +530,9 @@ const TasksScreen = () => {
                 {task.description && (
                   <Text style={styles.taskDescription}>{task.description}</Text>
                 )}
-                {task.completed && (
+                {task.is_completed && (
                   <View style={styles.completedBadge}>
-                    <Text style={styles.completedBadgeText}> Completed</Text>
+                    <Text style={styles.completedBadgeText}>✓ Done</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -473,7 +608,7 @@ const TasksScreen = () => {
                         styles.habitOptionTextSelected,
                     ]}
                   >
-                    {habit.name}
+                    {habit.title}
                   </Text>
                 </TouchableOpacity>
               ))}

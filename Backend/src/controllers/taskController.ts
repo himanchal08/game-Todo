@@ -1,33 +1,47 @@
 import { Response } from "express";
-import { supabase } from "../config/supabase";
+import { supabase, supabaseAdmin } from "../config/supabase";
 import { AuthRequest } from "../middlewares/authMiddleware";
 import { logUserActivity } from "../services/analyticsService";
 import { checkAndAwardBadges } from "../services/badgeService";
 
 export const createTask = async (req: AuthRequest, res: Response) => {
   try {
-    const { habitId, habit_id, title, description, dueDate, xpReward } =
-      req.body;
+    const {
+      habitId,
+      habit_id,
+      title,
+      description,
+      dueDate,
+      scheduled_for,
+      xpReward,
+      xp_reward,
+    } = req.body;
     const userId = req.user?.id;
 
     // Support both habitId and habit_id for flexibility
     // habit_id is optional - tasks can be standalone or linked to habits
     const taskHabitId = habitId || habit_id || null;
 
-    const { data, error } = await supabase
+    // Support both frontend (scheduled_for, xp_reward) and backend (dueDate, xpReward) naming
+    const taskDueDate = scheduled_for || dueDate;
+    const taskXpReward = xp_reward || xpReward || 10;
+
+    // Use admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from("tasks")
       .insert({
         habit_id: taskHabitId, // Can be null for standalone tasks
         user_id: userId,
         title,
         description,
-        due_date: dueDate,
-        xp_reward: xpReward || 10,
+        due_date: taskDueDate,
+        xp_reward: taskXpReward,
       })
       .select()
       .single();
 
     if (error) {
+      console.error("Task creation error:", error);
       return res.status(400).json({ error: error.message });
     }
 
@@ -42,7 +56,8 @@ export const getTodayTasks = async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
     const today = new Date().toISOString().split("T")[0];
 
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from("tasks")
       .select("*, habits(title, color)")
       .eq("user_id", userId)
@@ -50,6 +65,7 @@ export const getTodayTasks = async (req: AuthRequest, res: Response) => {
       .order("created_at", { ascending: true });
 
     if (error) {
+      console.error("Get today tasks error:", error);
       return res.status(400).json({ error: error.message });
     }
 
@@ -64,8 +80,8 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    // Get task details
-    const { data: task, error: taskError } = await supabase
+    // Get task details - use admin client
+    const { data: task, error: taskError } = await supabaseAdmin
       .from("tasks")
       .select("*, habits(id)")
       .eq("id", id)
@@ -80,8 +96,8 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Task already completed" });
     }
 
-    // Mark task as complete
-    const { error: updateError } = await supabase
+    // Mark task as complete - use admin client
+    const { error: updateError } = await supabaseAdmin
       .from("tasks")
       .update({
         is_completed: true,
@@ -93,16 +109,16 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: updateError.message });
     }
 
-    // Award XP
-    await supabase.from("xp_logs").insert({
+    // Award XP - use admin client
+    await supabaseAdmin.from("xp_logs").insert({
       user_id: userId,
       task_id: id,
       amount: task.xp_reward,
       reason: "Task completion",
     });
 
-    // Update total XP in profile
-    const { data: profile } = await supabase
+    // Update total XP in profile - use admin client
+    const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("total_xp")
       .eq("id", userId)
@@ -111,14 +127,14 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
     const newTotalXp = (profile?.total_xp || 0) + task.xp_reward;
     const newLevel = Math.floor(newTotalXp / 100) + 1; // 100 XP per level
 
-    await supabase
+    await supabaseAdmin
       .from("profiles")
       .update({ total_xp: newTotalXp, level: newLevel })
       .eq("id", userId);
 
-    // Update streak
+    // Update streak - use admin client
     const today = new Date().toISOString().split("T")[0];
-    const { data: streak } = await supabase
+    const { data: streak } = await supabaseAdmin
       .from("streaks")
       .select("*")
       .eq("habit_id", task.habit_id)
@@ -146,7 +162,7 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
 
       const newLongest = Math.max(newStreak, streak.longest_streak);
 
-      await supabase
+      await supabaseAdmin
         .from("streaks")
         .update({
           current_streak: newStreak,
@@ -180,7 +196,8 @@ export const getTasksByHabit = async (req: AuthRequest, res: Response) => {
     const { habitId } = req.params;
     const userId = req.user?.id;
 
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
       .from("tasks")
       .select("*")
       .eq("habit_id", habitId)
@@ -192,6 +209,32 @@ export const getTasksByHabit = async (req: AuthRequest, res: Response) => {
     }
 
     res.json({ tasks: data });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteCompletedTasks = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    // Use admin client to bypass RLS
+    const { data, error } = await supabaseAdmin
+      .from("tasks")
+      .delete()
+      .eq("user_id", userId)
+      .eq("is_completed", true)
+      .select();
+
+    if (error) {
+      console.error("Delete completed tasks error:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({
+      message: "Completed tasks deleted successfully",
+      deletedCount: data?.length || 0,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

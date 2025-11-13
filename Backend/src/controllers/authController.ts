@@ -109,7 +109,16 @@ export const logout = async (req: Request, res: Response) => {
 export const getProfile = async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "No authorization header" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ error: "No token provided" });
+    }
 
     const {
       data: { user },
@@ -119,13 +128,40 @@ export const getProfile = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { data: profile, error } = await supabase
+    // Use admin client to bypass RLS
+    const { data: profile, error } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
     if (error) {
+      // If profile not found, create it automatically
+      if (error.code === "PGRST116") {
+        console.log(`Profile not found for user ${user.id}, creating...`);
+
+        const { data: newProfile, error: createError } = await supabaseAdmin
+          .from("profiles")
+          .insert({
+            id: user.id,
+            full_name:
+              user.user_metadata?.full_name ||
+              user.email?.split("@")[0] ||
+              "User",
+            username: user.email?.split("@")[0] || "user",
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error("Auto profile creation error:", createError);
+          return res.status(500).json({ error: "Failed to create profile" });
+        }
+
+        return res.json({ profile: newProfile });
+      }
+
+      console.error("Profile fetch error:", error);
       return res.status(404).json({ error: "Profile not found" });
     }
 
@@ -138,7 +174,16 @@ export const getProfile = async (req: Request, res: Response) => {
 export const createProfile = async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
+
+    if (!authHeader) {
+      return res.status(401).json({ error: "No authorization header" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ error: "No token provided" });
+    }
 
     const {
       data: { user },

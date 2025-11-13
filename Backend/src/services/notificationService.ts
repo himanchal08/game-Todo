@@ -69,13 +69,25 @@ export const sendPushNotification = async (payload: NotificationPayload) => {
     }
 
     // Save to notification history
-    await supabaseAdmin.from("notification_history").insert({
-      user_id: userId,
-      notification_type: type,
-      title,
-      body,
-      data: data || {},
-    });
+    const { data: notifRecord, error: notifError } = await supabaseAdmin
+      .from("notification_history")
+      .insert({
+        user_id: userId,
+        notification_type: type,
+        title,
+        body,
+        data: data || {},
+      })
+      .select();
+
+    if (notifError) {
+      console.error("Error saving notification to history:", notifError);
+    } else {
+      console.log(
+        `Notification saved to history for user ${userId}:`,
+        notifRecord
+      );
+    }
 
     console.log(`Sent ${tickets.length} notifications to user ${userId}`);
     return { success: true, tickets };
@@ -175,5 +187,22 @@ export const sendLevelUpAlert = async (userId: string, newLevel: number) => {
     body: `Congratulations! You've reached Level ${newLevel}! Keep up the great work!`,
     data: { type: "level_up", level: newLevel },
     type: "level_up",
+  });
+};
+
+/**
+ * Send motivational message to user
+ */
+export const sendMotivationalMessage = async (
+  userId: string,
+  message: string,
+  title: string = "💪 Stay Motivated!"
+) => {
+  return sendPushNotification({
+    userId,
+    title,
+    body: message,
+    data: { type: "motivation" },
+    type: "motivation",
   });
 };

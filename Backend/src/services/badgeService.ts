@@ -58,11 +58,15 @@ export const checkAndAwardBadges = async (userId: string) => {
         newlyEarnedBadges.push(badge);
 
         // Send notification
+        console.log(
+          `Sending badge notification for ${badge.name} to user ${userId}`
+        );
         await sendAchievementAlert(
           userId,
           `${badge.icon} ${badge.name}`,
           badge.description
         );
+        console.log(`Badge notification sent for ${badge.name}`);
       }
     }
 

@@ -137,11 +137,125 @@ export const scheduleComebackPrompts = () => {
 };
 
 /**
+ * Send morning motivation to all active users
+ * Runs daily at 8 AM
+ */
+export const scheduleMorningMotivation = () => {
+  const { getTimeBasedMessage } = require("./motivationalMessages");
+  const { sendMotivationalMessage } = require("./notificationService");
+
+  cron.schedule("0 8 * * *", async () => {
+    try {
+      // Get users who have morning motivation enabled
+      const { data: preferences } = await supabaseAdmin
+        .from("notification_preferences")
+        .select("user_id, motivational_messages")
+        .eq("motivational_messages", true);
+
+      if (!preferences) return;
+
+      for (const pref of preferences) {
+        const message = getTimeBasedMessage();
+        await sendMotivationalMessage(
+          pref.user_id,
+          message,
+          "☀️ Good Morning!"
+        );
+      }
+
+      console.log(`☀️ Morning motivation sent to ${preferences.length} users`);
+    } catch (error) {
+      console.error("Morning motivation error:", error);
+    }
+  });
+
+  console.log("☀️ Morning motivation scheduler started");
+};
+
+/**
+ * Send midday boost to active users
+ * Runs daily at 2 PM
+ */
+export const scheduleMidDayBoost = () => {
+  const { getRandomMessage, midDayBoost } = require("./motivationalMessages");
+  const { sendMotivationalMessage } = require("./notificationService");
+
+  cron.schedule("0 14 * * *", async () => {
+    try {
+      // Get users who have midday boost enabled
+      const { data: preferences } = await supabaseAdmin
+        .from("notification_preferences")
+        .select("user_id, motivational_messages")
+        .eq("motivational_messages", true);
+
+      if (!preferences) return;
+
+      for (const pref of preferences) {
+        const message = getRandomMessage(midDayBoost);
+        await sendMotivationalMessage(
+          pref.user_id,
+          message,
+          "⚡ Midday Boost!"
+        );
+      }
+
+      console.log(`⚡ Midday boost sent to ${preferences.length} users`);
+    } catch (error) {
+      console.error("Midday boost error:", error);
+    }
+  });
+
+  console.log("⚡ Midday boost scheduler started");
+};
+
+/**
+ * Send evening reflection to users
+ * Runs daily at 8 PM
+ */
+export const scheduleEveningReflection = () => {
+  const {
+    getRandomMessage,
+    eveningReflection,
+  } = require("./motivationalMessages");
+  const { sendMotivationalMessage } = require("./notificationService");
+
+  cron.schedule("0 20 * * *", async () => {
+    try {
+      // Get users who have evening reflection enabled
+      const { data: preferences } = await supabaseAdmin
+        .from("notification_preferences")
+        .select("user_id, motivational_messages")
+        .eq("motivational_messages", true);
+
+      if (!preferences) return;
+
+      for (const pref of preferences) {
+        const message = getRandomMessage(eveningReflection);
+        await sendMotivationalMessage(
+          pref.user_id,
+          message,
+          "🌙 Evening Check-in"
+        );
+      }
+
+      console.log(`🌙 Evening reflection sent to ${preferences.length} users`);
+    } catch (error) {
+      console.error("Evening reflection error:", error);
+    }
+  });
+
+  console.log("🌙 Evening reflection scheduler started");
+};
+
+/**
  * Start all notification schedulers
  */
 export const startNotificationSchedulers = () => {
   scheduleDailyReminders();
   scheduleStreakRiskAlerts();
   scheduleComebackPrompts();
+  scheduleMorningMotivation();
+  scheduleMidDayBoost();
+  scheduleEveningReflection();
   console.log("🔔 All notification schedulers started");
 };

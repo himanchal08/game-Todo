@@ -1,19 +1,21 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
   createTask,
   getTodayTasks,
   completeTask,
   getTasksByHabit,
-} from '../controllers/taskController';
-import { authenticateToken } from '../middlewares/authMiddleware';
+  deleteCompletedTasks,
+} from "../controllers/taskController";
+import { authenticateToken } from "../middlewares/authMiddleware";
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.post('/', createTask);
-router.get('/today', getTodayTasks);
-router.post('/:id/complete', completeTask);
-router.get('/habit/:habitId', getTasksByHabit);
+router.post("/", createTask);
+router.get("/today", getTodayTasks);
+router.post("/:id/complete", completeTask);
+router.get("/habit/:habitId", getTasksByHabit);
+router.delete("/completed", deleteCompletedTasks);
 
 export default router;
