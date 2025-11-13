@@ -1,104 +1,109 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
   Modal,
   Alert,
-} from 'react-native';
-import { supabase } from '../services/supabase';
+  RefreshControl,
+} from "react-native";
+import api from "../services/api";
+import { streaksAPI } from "../services/api";
+import styles from "../styles/screens/HabitsScreen.styles";
 
 interface Habit {
   id: string;
-  title: string;
+  name: string;
   description: string;
-  category: string;
   frequency: string;
-  color: string;
-  streaks: {
-    current_streak: number;
-    longest_streak: number;
-  };
+  reminder_time?: string;
+}
+
+interface Streak {
+  habit_id: string;
+  habit_name: string;
+  current_streak: number;
+  longest_streak: number;
+  last_completed: string;
 }
 
 const HabitsScreen = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [streaks, setStreaks] = useState<Streak[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [newHabit, setNewHabit] = useState({
-    title: '',
-    description: '',
-    category: '',
-    color: '#3B82F6',
+    name: "",
+    description: "",
+    frequency: "daily",
+    reminder_time: "09:00:00",
   });
 
   const fetchHabits = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('habits')
-      .select('*, streaks(*)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching habits:', error);
-      return;
+    try {
+      const response = await api.habits.getAll();
+      setHabits(response.habits || []);
+    } catch (error: any) {
+      console.error("Error fetching habits:", error);
+      Alert.alert("Error", error.message || "Failed to fetch habits");
     }
+  };
 
-    setHabits(data || []);
+  const fetchStreaks = async () => {
+    try {
+      const response = await streaksAPI.getAll();
+      setStreaks(response.streaks || []);
+    } catch (error: any) {
+      console.error("Error fetching streaks:", error);
+    }
   };
 
   const handleCreateHabit = async () => {
-    if (!newHabit.title.trim()) {
-      Alert.alert('Error', 'Please enter a habit title');
+    if (!newHabit.name.trim()) {
+      Alert.alert("Error", "Please enter a habit name");
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     try {
-      const { error } = await supabase.from('habits').insert({
-        user_id: user.id,
-        title: newHabit.title,
+      await api.habits.create({
+        name: newHabit.name,
         description: newHabit.description,
-        category: newHabit.category || 'general',
-        color: newHabit.color,
-        frequency: 'daily',
+        frequency: newHabit.frequency,
+        reminder_time: newHabit.reminder_time,
       });
-
-      if (error) throw error;
 
       setModalVisible(false);
       setNewHabit({
-        title: '',
-        description: '',
-        category: '',
-        color: '#3B82F6',
+        name: "",
+        description: "",
+        frequency: "daily",
+        reminder_time: "09:00:00",
       });
-      fetchHabits();
+
+      await fetchHabits();
+      Alert.alert("Success", "Habit created successfully! 🎯");
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      console.error("Error creating habit:", error);
+      Alert.alert("Error", error.message || "Failed to create habit");
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchHabits(), fetchStreaks()]);
+    setRefreshing(false);
+  };
+
+  const getStreakForHabit = (habitId: string) => {
+    return streaks.find((s) => s.habit_id === habitId);
   };
 
   useEffect(() => {
     fetchHabits();
+    fetchStreaks();
   }, []);
-
-  const colorOptions = [
-    '#3B82F6', // Blue
-    '#10B981', // Green
-    '#F59E0B', // Yellow
-    '#EF4444', // Red
-    '#8B5CF6', // Purple
-    '#EC4899', // Pink
-  ];
 
   return (
     <View style={styles.container}>
@@ -112,31 +117,44 @@ const HabitsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.habitList}>
-        {habits.map((habit) => (
-          <View
-            key={habit.id}
-            style={[styles.habitCard, { borderLeftColor: habit.color }]}
-          >
-            <View style={styles.habitHeader}>
-              <Text style={styles.habitTitle}>{habit.title}</Text>
-              <View style={styles.streakBadge}>
-                <Text style={styles.streakText}>
-                  🔥 {habit.streaks?.current_streak || 0}
+      <ScrollView
+        style={styles.habitList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {habits.map((habit) => {
+          const streak = getStreakForHabit(habit.id);
+          return (
+            <View
+              key={habit.id}
+              style={[styles.habitCard, { borderLeftColor: "#3B82F6" }]}
+            >
+              <View style={styles.habitHeader}>
+                <Text style={styles.habitTitle}>{habit.name}</Text>
+                <View style={styles.streakBadge}>
+                  <Text style={styles.streakText}>
+                    🔥 {streak?.current_streak || 0}
+                  </Text>
+                </View>
+              </View>
+              {habit.description && (
+                <Text style={styles.habitDescription}>{habit.description}</Text>
+              )}
+              <View style={styles.habitFooter}>
+                <Text style={styles.category}>{habit.frequency}</Text>
+                <Text style={styles.bestStreak}>
+                  Best: {streak?.longest_streak || 0} days
                 </Text>
               </View>
             </View>
-            {habit.description && (
-              <Text style={styles.habitDescription}>{habit.description}</Text>
-            )}
-            <View style={styles.habitFooter}>
-              <Text style={styles.category}>{habit.category}</Text>
-              <Text style={styles.bestStreak}>
-                Best: {habit.streaks?.longest_streak || 0} days
-              </Text>
-            </View>
-          </View>
-        ))}
+          );
+        })}
+        {habits.length === 0 && (
+          <Text style={styles.emptyText}>
+            No habits yet. Create your first habit to get started! 🎯
+          </Text>
+        )}
       </ScrollView>
 
       <Modal
@@ -151,9 +169,9 @@ const HabitsScreen = () => {
 
             <TextInput
               style={styles.input}
-              placeholder="Habit Title"
-              value={newHabit.title}
-              onChangeText={(text) => setNewHabit({ ...newHabit, title: text })}
+              placeholder="Habit Name"
+              value={newHabit.name}
+              onChangeText={(text) => setNewHabit({ ...newHabit, name: text })}
             />
 
             <TextInput
@@ -164,33 +182,41 @@ const HabitsScreen = () => {
                 setNewHabit({ ...newHabit, description: text })
               }
               multiline
+              numberOfLines={3}
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Category (optional)"
-              value={newHabit.category}
-              onChangeText={(text) =>
-                setNewHabit({ ...newHabit, category: text })
-              }
-            />
-
-            <Text style={styles.colorLabel}>Choose Color:</Text>
-            <View style={styles.colorGrid}>
-              {colorOptions.map((color) => (
+            <Text style={styles.label}>Frequency:</Text>
+            <View style={styles.frequencyOptions}>
+              {["daily", "weekly", "custom"].map((freq) => (
                 <TouchableOpacity
-                  key={color}
+                  key={freq}
                   style={[
-                    styles.colorOption,
-                    {
-                      backgroundColor: color,
-                      borderWidth: newHabit.color === color ? 3 : 0,
-                    },
+                    styles.frequencyButton,
+                    newHabit.frequency === freq && styles.frequencyButtonActive,
                   ]}
-                  onPress={() => setNewHabit({ ...newHabit, color })}
-                />
+                  onPress={() => setNewHabit({ ...newHabit, frequency: freq })}
+                >
+                  <Text
+                    style={[
+                      styles.frequencyText,
+                      newHabit.frequency === freq && styles.frequencyTextActive,
+                    ]}
+                  >
+                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={styles.label}>Reminder Time (HH:MM:SS):</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="09:00:00"
+              value={newHabit.reminder_time}
+              onChangeText={(text) =>
+                setNewHabit({ ...newHabit, reminder_time: text })
+              }
+            />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -212,166 +238,5 @@ const HabitsScreen = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  habitList: {
-    flex: 1,
-  },
-  habitCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  habitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  habitTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-  },
-  streakBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  streakText: {
-    color: '#D97706',
-    fontWeight: '600',
-  },
-  habitDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  habitFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  category: {
-    fontSize: 12,
-    color: '#6B7280',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  bestStreak: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  colorLabel: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-  },
-  colorOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    margin: 5,
-    borderColor: '#fff',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 8,
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  createButton: {
-    backgroundColor: '#3B82F6',
-  },
-  cancelButtonText: {
-    color: '#374151',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  createButtonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-});
 
 export default HabitsScreen;

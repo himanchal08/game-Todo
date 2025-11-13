@@ -20,6 +20,7 @@ import { errorHandler } from "./middlewares/errorMiddleware";
 // Import utilities
 import { startCleanupSchedule } from "./utils/cleanup";
 import { startNotificationSchedulers } from "./services/schedulerService";
+import { startProofCleanupScheduler } from "./services/proofCleanupService";
 
 dotenv.config();
 
@@ -61,4 +62,7 @@ app.listen(PORT, () => {
 
   // Start notification schedulers
   startNotificationSchedulers();
+
+  // Start proof cleanup scheduler (deletes photos after 90 minutes)
+  startProofCleanupScheduler();
 });

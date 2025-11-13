@@ -1,158 +1,336 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
   Modal,
   Alert,
-} from 'react-native';
-import { supabase } from '../services/supabase';
+  RefreshControl,
+  Image,
+  Platform,
+} from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import * as FileSystem from "expo-file-system";
+import api from "../services/api";
+import styles from "../styles/screens/TasksScreen.styles";
 
 interface Task {
   id: string;
   title: string;
   description: string;
-  due_date: string;
-  is_completed: boolean;
+  scheduled_for: string;
+  completed: boolean;
   xp_reward: number;
-  habit_id: string;
-  habits: {
-    title: string;
-    color: string;
-  };
+  habit_id?: string; // Optional - tasks can be standalone or under habits
 }
 
 interface Habit {
   id: string;
-  title: string;
-  color: string;
+  name: string;
+  frequency: string;
 }
 
 const TasksScreen = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [proofModalVisible, setProofModalVisible] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    habitId: '',
-    dueDate: new Date().toISOString().split('T')[0],
-    xpReward: '10',
+    title: "",
+    description: "",
+    habitId: "",
+    scheduledFor: new Date().toISOString().split("T")[0],
+    xpReward: "50",
   });
 
   const fetchTasks = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*, habits(title, color)')
-      .eq('user_id', user.id)
-      .order('due_date', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching tasks:', error);
-      return;
+    try {
+      const response = await api.tasks.getTodayTasks();
+      setTasks(response.tasks || []);
+    } catch (error: any) {
+      console.error("Error fetching tasks:", error);
+      Alert.alert("Error", error.message || "Failed to fetch tasks");
     }
-
-    setTasks(data || []);
   };
 
   const fetchHabits = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('habits')
-      .select('id, title, color')
-      .eq('user_id', user.id)
-      .eq('is_active', true);
-
-    if (error) {
-      console.error('Error fetching habits:', error);
-      return;
+    try {
+      const response = await api.habits.getAll();
+      setHabits(response.habits || []);
+    } catch (error: any) {
+      console.error("Error fetching habits:", error);
+      Alert.alert("Error", error.message || "Failed to fetch habits");
     }
-
-    setHabits(data || []);
   };
 
   const handleCreateTask = async () => {
-    console.log('Creating new task:', newTask); // Debug log
-
     if (!newTask.title.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
+      Alert.alert("Error", "Please enter a task title");
       return;
     }
 
-    if (!newTask.habitId) {
-      Alert.alert('Error', 'Please select a habit');
-      return;
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to create tasks');
-      return;
-    }
+    // Habit is optional - users can create standalone tasks or tasks under habits
 
     try {
-      console.log('Creating task with data:', {
-        user_id: user.id,
-        habit_id: newTask.habitId,
+      const taskData: any = {
         title: newTask.title,
         description: newTask.description,
-        due_date: newTask.dueDate,
-        xp_reward: parseInt(newTask.xpReward),
-      }); // Debug log
+        xp_reward: parseInt(newTask.xpReward) || 50,
+        scheduled_for: newTask.scheduledFor,
+      };
 
-      const { data, error } = await supabase.from('tasks').insert({
-        user_id: user.id,
-        habit_id: newTask.habitId,
-        title: newTask.title,
-        description: newTask.description,
-        due_date: newTask.dueDate,
-        xp_reward: parseInt(newTask.xpReward),
-        is_completed: false, // Add this field explicitly
-      }).select();
-
-      if (error) {
-        console.error('Error creating task:', error); // Debug log
-        throw error;
+      // Only include habit_id if a habit is selected
+      if (newTask.habitId) {
+        taskData.habit_id = newTask.habitId;
       }
 
-      console.log('Task created successfully:', data); // Debug log
+      await api.tasks.create(taskData);
 
       setModalVisible(false);
       setNewTask({
-        title: '',
-        description: '',
-        habitId: '',
-        dueDate: new Date().toISOString().split('T')[0],
-        xpReward: '10',
+        title: "",
+        description: "",
+        habitId: "",
+        scheduledFor: new Date().toISOString().split("T")[0],
+        xpReward: "50",
       });
-      await fetchTasks(); // Refresh the task list
-      Alert.alert('Success', 'Task created successfully!');
+
+      await fetchTasks();
+      Alert.alert("Success", "Task created successfully! ");
     } catch (error: any) {
-      console.error('Error in handleCreateTask:', error); // Debug log
-      Alert.alert('Error', error.message || 'Failed to create task. Please try again.');
+      console.error("Error creating task:", error);
+      Alert.alert("Error", error.message || "Failed to create task");
     }
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ is_completed: true })
-        .eq('id', taskId);
+    // Photo verification is mandatory for task completion
+    Alert.alert(
+      "Complete Task",
+      "Please add a proof photo to complete this task. This helps verify your progress!",
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            setSelectedTaskId(taskId);
+            setProofModalVisible(true);
+          },
+        },
+      ]
+    );
+  };
 
-      if (error) throw error;
-      fetchTasks();
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
+  // Photo verification is now mandatory, so this function is no longer used
+  // const completeTaskWithoutProof = async (taskId: string) => {
+  //   try {
+  //     const response = await api.tasks.complete(taskId);
+  //     let message = `+${response.xpAwarded} XP earned!`;
+  //     if (response.newLevel) {
+  //       message += `\n🎉 Level Up! You're now level ${response.newLevel}!`;
+  //     }
+  //     if (response.newBadges && response.newBadges.length > 0) {
+  //       message += `\n🏆 New Badge: ${response.newBadges
+  //         .map((b: any) => b.name)
+  //         .join(", ")}`;
+  //     }
+  //     Alert.alert("Task Completed! ✅", message);
+  //     await fetchTasks();
+  //   } catch (error: any) {
+  //     console.error("Error completing task:", error);
+  //     Alert.alert("Error", error.message || "Failed to complete task");
+  //   }
+  // };
+
+  const requestPermissions = async () => {
+    try {
+      // Request camera permission
+      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+      if (cameraStatus.status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Camera permission is required to take photos"
+        );
+        return false;
+      }
+
+      // Request media library permission (for saving photos)
+      const mediaStatus = await MediaLibrary.requestPermissionsAsync();
+      if (mediaStatus.status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Storage permission is needed to save your proof photos to your device. " +
+            "Photos will be stored locally and deleted from our server after 90 minutes.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Grant Permission",
+              onPress: async () => {
+                await MediaLibrary.requestPermissionsAsync();
+              },
+            },
+          ]
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error requesting permissions:", error);
+      return false;
     }
+  };
+
+  const takePhoto = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setCapturedImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error taking photo:", error);
+      Alert.alert("Error", "Failed to take photo");
+    }
+  };
+
+  const pickImage = async () => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setCapturedImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
+
+  const savePhotoToDevice = async (localUri: string) => {
+    try {
+      // Save the captured/picked photo to gallery in a dedicated album
+      const { status } = await MediaLibrary.getPermissionsAsync();
+      if (status !== "granted") {
+        // Photo is already on device from camera/picker, just notify user
+        console.log(
+          "Media library permission not granted, photo already on device"
+        );
+        return;
+      }
+
+      // Create asset from the local URI (photo is already on device)
+      const asset = await MediaLibrary.createAssetAsync(localUri);
+
+      // Try to create/get the "Task Proofs" album and add the photo
+      try {
+        const album = await MediaLibrary.getAlbumAsync("Task Proofs");
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync("Task Proofs", asset, false);
+        }
+      } catch (albumError) {
+        // Album operations failed, but photo is still saved to device
+        console.log(
+          "Album operation failed, photo still on device:",
+          albumError
+        );
+      }
+
+      Alert.alert(
+        "Success! 📸",
+        "Your proof photo has been saved to your gallery. " +
+          "It will be automatically deleted from our server after 90 minutes, " +
+          "but will remain on your device."
+      );
+    } catch (error) {
+      console.error("Error organizing photo:", error);
+      // Photo is still on device from camera/picker
+      Alert.alert(
+        "Photo Saved",
+        "Your proof photo is saved on your device. " +
+          "It will be deleted from our server after 90 minutes."
+      );
+    }
+  };
+
+  const submitProofAndComplete = async () => {
+    if (!capturedImage || !selectedTaskId) return;
+
+    try {
+      Alert.alert(
+        "Uploading...",
+        "Please wait while we upload your proof photo"
+      );
+
+      // Save photo to device first (it's already local from camera/picker)
+      if (capturedImage) {
+        await savePhotoToDevice(capturedImage);
+      }
+
+      // Upload proof to server
+      const proofResponse = await api.proofs.upload(
+        selectedTaskId,
+        capturedImage
+      );
+
+      // Complete task
+      const completeResponse = await api.tasks.complete(selectedTaskId);
+
+      let message = `+${
+        completeResponse.xpAwarded + (proofResponse.xpBonus || 0)
+      } XP earned!`;
+      if (completeResponse.newLevel) {
+        message += `\n🎉 Level Up! You're now level ${completeResponse.newLevel}!`;
+      }
+      if (completeResponse.newBadges && completeResponse.newBadges.length > 0) {
+        message += `\n🏆 New Badge: ${completeResponse.newBadges
+          .map((b: any) => b.name)
+          .join(", ")}`;
+      }
+      if (proofResponse.xpBonus) {
+        message += `\n📸 Proof Photo Bonus: +${proofResponse.xpBonus} XP!`;
+      }
+
+      Alert.alert("Task Completed! ✅", message);
+
+      // Reset states
+      setProofModalVisible(false);
+      setCapturedImage(null);
+      setSelectedTaskId(null);
+      await fetchTasks();
+    } catch (error: any) {
+      console.error("Error submitting proof:", error);
+      Alert.alert("Error", error.message || "Failed to submit proof");
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchTasks(), fetchHabits()]);
+    setRefreshing(false);
   };
 
   useEffect(() => {
@@ -162,7 +340,7 @@ const TasksScreen = () => {
 
   const groupTasksByDate = () => {
     const grouped = tasks.reduce((acc: { [key: string]: Task[] }, task) => {
-      const date = task.due_date;
+      const date = task.scheduled_for;
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -187,27 +365,27 @@ const TasksScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.taskList}>
+      <ScrollView
+        style={styles.taskList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {groupTasksByDate().map(([date, dateTasks]) => (
           <View key={date}>
             <Text style={styles.dateHeader}>{date}</Text>
             {dateTasks.map((task) => (
               <TouchableOpacity
                 key={task.id}
-                style={[
-                  styles.taskCard,
-                  {
-                    borderLeftColor: task.habits?.color || '#3B82F6',
-                    opacity: task.is_completed ? 0.7 : 1,
-                  },
-                ]}
-                onPress={() => !task.is_completed && handleCompleteTask(task.id)}
+                style={[styles.taskCard, { opacity: task.completed ? 0.6 : 1 }]}
+                onPress={() => !task.completed && handleCompleteTask(task.id)}
+                disabled={task.completed}
               >
                 <View style={styles.taskHeader}>
                   <Text
                     style={[
                       styles.taskTitle,
-                      task.is_completed && styles.completedText,
+                      task.completed && styles.completedText,
                     ]}
                   >
                     {task.title}
@@ -217,16 +395,20 @@ const TasksScreen = () => {
                 {task.description && (
                   <Text style={styles.taskDescription}>{task.description}</Text>
                 )}
-                <Text style={styles.habitName}>{task.habits?.title}</Text>
-                {task.is_completed && (
+                {task.completed && (
                   <View style={styles.completedBadge}>
-                    <Text style={styles.completedBadgeText}>Completed</Text>
+                    <Text style={styles.completedBadgeText}> Completed</Text>
                   </View>
                 )}
               </TouchableOpacity>
             ))}
           </View>
         ))}
+        {tasks.length === 0 && (
+          <Text style={styles.emptyText}>
+            No tasks yet. Create your first task!{" "}
+          </Text>
+        )}
       </ScrollView>
 
       <Modal
@@ -254,61 +436,82 @@ const TasksScreen = () => {
                 setNewTask({ ...newTask, description: text })
               }
               multiline
+              numberOfLines={3}
             />
 
-            <Text style={styles.label}>Select Habit:</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.habitSelector}
-            >
+            <Text style={styles.label}>Select Habit (Optional):</Text>
+            <ScrollView style={styles.habitsList}>
+              <TouchableOpacity
+                style={[
+                  styles.habitOption,
+                  !newTask.habitId && styles.habitOptionSelected,
+                ]}
+                onPress={() => setNewTask({ ...newTask, habitId: "" })}
+              >
+                <Text
+                  style={[
+                    styles.habitOptionText,
+                    !newTask.habitId && styles.habitOptionTextSelected,
+                  ]}
+                >
+                  ⭐ None (Standalone Task)
+                </Text>
+              </TouchableOpacity>
               {habits.map((habit) => (
                 <TouchableOpacity
                   key={habit.id}
                   style={[
-                    styles.habitChip,
-                    {
-                      backgroundColor:
-                        newTask.habitId === habit.id
-                          ? habit.color
-                          : 'transparent',
-                      borderColor: habit.color,
-                    },
+                    styles.habitOption,
+                    newTask.habitId === habit.id && styles.habitOptionSelected,
                   ]}
                   onPress={() => setNewTask({ ...newTask, habitId: habit.id })}
                 >
                   <Text
                     style={[
-                      styles.habitChipText,
-                      {
-                        color:
-                          newTask.habitId === habit.id ? '#fff' : habit.color,
-                      },
+                      styles.habitOptionText,
+                      newTask.habitId === habit.id &&
+                        styles.habitOptionTextSelected,
                     ]}
                   >
-                    {habit.title}
+                    {habit.name}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
+            <Text style={styles.label}>XP Reward:</Text>
             <TextInput
               style={styles.input}
               placeholder="XP Reward"
               value={newTask.xpReward}
-              onChangeText={(text) => setNewTask({ ...newTask, xpReward: text })}
+              onChangeText={(text) =>
+                setNewTask({
+                  ...newTask,
+                  xpReward: text.replace(/[^0-9]/g, ""),
+                })
+              }
               keyboardType="numeric"
+            />
+
+            <Text style={styles.label}>Scheduled For:</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              value={newTask.scheduledFor}
+              onChangeText={(text) =>
+                setNewTask({ ...newTask, scheduledFor: text })
+              }
             />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.button, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.createButton]}
+                style={[styles.button, styles.createButton]}
                 onPress={handleCreateTask}
               >
                 <Text style={styles.createButtonText}>Create</Text>
@@ -317,180 +520,88 @@ const TasksScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Proof Photo Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={proofModalVisible}
+        onRequestClose={() => {
+          setProofModalVisible(false);
+          setCapturedImage(null);
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.proofModalContent}>
+            <Text style={styles.modalTitle}>Proof Photo Required 📸</Text>
+            <Text style={styles.proofNote}>
+              Photo verification is mandatory to complete this task. Your photo
+              will be saved to your device and automatically deleted from our
+              server after 90 minutes for privacy.
+            </Text>
+
+            {capturedImage ? (
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{ uri: capturedImage }}
+                  style={styles.imagePreview}
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={() => setCapturedImage(null)}
+                >
+                  <Text style={styles.removeImageText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.photoOptions}>
+                <TouchableOpacity
+                  style={styles.photoButton}
+                  onPress={takePhoto}
+                >
+                  <Text style={styles.photoButtonIcon}>📷</Text>
+                  <Text style={styles.photoButtonText}>Take Photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.photoButton}
+                  onPress={pickImage}
+                >
+                  <Text style={styles.photoButtonIcon}>🖼️</Text>
+                  <Text style={styles.photoButtonText}>
+                    Choose from Gallery
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setProofModalVisible(false);
+                  setCapturedImage(null);
+                  setSelectedTaskId(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.createButton,
+                  !capturedImage && styles.disabledButton,
+                ]}
+                onPress={submitProofAndComplete}
+                disabled={!capturedImage}
+              >
+                <Text style={styles.createButtonText}>Submit & Complete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  dateHeader: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#4B5563',
-  },
-  taskList: {
-    flex: 1,
-  },
-  taskCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  completedText: {
-    textDecorationLine: 'line-through',
-    color: '#9CA3AF',
-  },
-  xpReward: {
-    fontSize: 14,
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 5,
-  },
-  habitName: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  completedBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  completedBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#4B5563',
-  },
-  habitSelector: {
-    flexDirection: 'row',
-    marginBottom: 15,
-  },
-  habitChip: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-  },
-  habitChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 8,
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  createButton: {
-    backgroundColor: '#3B82F6',
-  },
-  cancelButtonText: {
-    color: '#374151',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  createButtonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-});
 
 export default TasksScreen;

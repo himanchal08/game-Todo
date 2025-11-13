@@ -6,13 +6,18 @@ import { checkAndAwardBadges } from "../services/badgeService";
 
 export const createTask = async (req: AuthRequest, res: Response) => {
   try {
-    const { habitId, title, description, dueDate, xpReward } = req.body;
+    const { habitId, habit_id, title, description, dueDate, xpReward } =
+      req.body;
     const userId = req.user?.id;
+
+    // Support both habitId and habit_id for flexibility
+    // habit_id is optional - tasks can be standalone or linked to habits
+    const taskHabitId = habitId || habit_id || null;
 
     const { data, error } = await supabase
       .from("tasks")
       .insert({
-        habit_id: habitId,
+        habit_id: taskHabitId, // Can be null for standalone tasks
         user_id: userId,
         title,
         description,
