@@ -656,3 +656,13 @@ export default {
   notifications: notificationsAPI,
   analytics: analyticsAPI,
 };
+
+// Named exports for convenience
+export const authService = authAPI;
+export const habitsService = habitsAPI;
+export const tasksService = tasksAPI;
+export const xpService = xpAPI;
+export const streaksService = streaksAPI;
+export const proofsService = proofsAPI;
+export const notificationsService = notificationsAPI;
+export const analyticsService = analyticsAPI;

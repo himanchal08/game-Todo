@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,18 @@ import {
   Alert,
   RefreshControl,
   Image,
-  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Dimensions,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
 import api from "../services/api";
-import styles from "../styles/screens/TasksScreen.styles";
+import { COLORS, SPACING, RADIUS } from "../theme";
+
+const { width } = Dimensions.get("window");
 
 interface Task {
   id: string;
@@ -25,7 +30,7 @@ interface Task {
   completed: boolean;
   is_completed: boolean;
   xp_reward: number;
-  habit_id?: string; // Optional - tasks can be standalone or under habits
+  habit_id?: string;
 }
 
 interface Habit {
@@ -70,7 +75,6 @@ const TasksScreen = ({ route }: any) => {
       setHabits(response.habits || []);
     } catch (error: any) {
       console.error("Error fetching habits:", error);
-      Alert.alert("Error", error.message || "Failed to fetch habits");
     }
   };
 
@@ -80,8 +84,6 @@ const TasksScreen = ({ route }: any) => {
       return;
     }
 
-    // Habit is optional - users can create standalone tasks or tasks under habits
-
     try {
       const taskData: any = {
         title: newTask.title,
@@ -90,7 +92,6 @@ const TasksScreen = ({ route }: any) => {
         scheduled_for: newTask.scheduledFor,
       };
 
-      // Only include habit_id if a habit is selected
       if (newTask.habitId) {
         taskData.habit_id = newTask.habitId;
       }
@@ -107,7 +108,7 @@ const TasksScreen = ({ route }: any) => {
       });
 
       await fetchTasks();
-      Alert.alert("Success", "Task created successfully! ");
+      Alert.alert("Success", "Task created successfully! 🎯");
     } catch (error: any) {
       console.error("Error creating task:", error);
       Alert.alert("Error", error.message || "Failed to create task");
@@ -115,7 +116,6 @@ const TasksScreen = ({ route }: any) => {
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    // Photo verification is mandatory for task completion
     Alert.alert(
       "Complete Task",
       "Please add a proof photo to complete this task. This helps verify your progress!",
@@ -131,30 +131,8 @@ const TasksScreen = ({ route }: any) => {
     );
   };
 
-  // Photo verification is now mandatory, so this function is no longer used
-  // const completeTaskWithoutProof = async (taskId: string) => {
-  //   try {
-  //     const response = await api.tasks.complete(taskId);
-  //     let message = `+${response.xpAwarded} XP earned!`;
-  //     if (response.newLevel) {
-  //       message += `\n🎉 Level Up! You're now level ${response.newLevel}!`;
-  //     }
-  //     if (response.newBadges && response.newBadges.length > 0) {
-  //       message += `\n🏆 New Badge: ${response.newBadges
-  //         .map((b: any) => b.name)
-  //         .join(", ")}`;
-  //     }
-  //     Alert.alert("Task Completed! ✅", message);
-  //     await fetchTasks();
-  //   } catch (error: any) {
-  //     console.error("Error completing task:", error);
-  //     Alert.alert("Error", error.message || "Failed to complete task");
-  //   }
-  // };
-
   const requestPermissions = async () => {
     try {
-      // Request camera permission
       const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
       if (cameraStatus.status !== "granted") {
         Alert.alert(
@@ -163,17 +141,10 @@ const TasksScreen = ({ route }: any) => {
         );
         return false;
       }
-
-      // Note: Camera photos are auto-saved by Android to your gallery
-      // We'll try to organize them into an album later if we have permission
-      console.log(
-        "✅ Camera permission granted - photos will be saved automatically"
-      );
-
       return true;
     } catch (error) {
       console.error("Error requesting permissions:", error);
-      return true; // Allow to proceed - camera will save photos
+      return true;
     }
   };
 
@@ -220,7 +191,6 @@ const TasksScreen = ({ route }: any) => {
   };
 
   const savePhotoToDevice = async (localUri: string) => {
-    // Offer to share/save the photo
     Alert.alert(
       "Save Photo? 📸",
       "Would you like to save this proof photo to your device?",
@@ -236,19 +206,16 @@ const TasksScreen = ({ route }: any) => {
                   mimeType: "image/jpeg",
                   dialogTitle: "Save your task proof photo",
                 });
-                console.log("✅ Photo shared - user can save it");
-              } else {
-                Alert.alert("Info", "Photo uploaded to server successfully!");
               }
             } catch (error) {
               console.error("Error sharing photo:", error);
-              Alert.alert("Note", "Photo uploaded to server successfully!");
             }
           },
         },
       ]
     );
   };
+
   const submitProofAndComplete = async () => {
     if (!capturedImage || !selectedTaskId) return;
 
@@ -258,23 +225,20 @@ const TasksScreen = ({ route }: any) => {
         "Please wait while we upload your proof photo"
       );
 
-      // Save photo to device first (it's already local from camera/picker)
       if (capturedImage) {
         await savePhotoToDevice(capturedImage);
       }
 
-      // Upload proof to server
       const proofResponse = await api.proofs.upload(
         selectedTaskId,
         capturedImage
       );
-
-      // Complete task
       const completeResponse = await api.tasks.complete(selectedTaskId);
 
       let message = `Task completed! +${
         completeResponse.xpAwarded + (proofResponse.xpBonus || 0)
-      } XP earned!\n📸 Photo saved to your gallery!`;
+      } XP earned!\n📸 Photo saved!`;
+
       if (completeResponse.newLevel) {
         message += `\n🎉 Level Up! You're now level ${completeResponse.newLevel}!`;
       }
@@ -284,12 +248,11 @@ const TasksScreen = ({ route }: any) => {
           .join(", ")}`;
       }
       if (proofResponse.xpBonus) {
-        message += `\n📸 Proof Photo Bonus: +${proofResponse.xpBonus} XP!`;
+        message += `\n📸 Proof Bonus: +${proofResponse.xpBonus} XP!`;
       }
 
       Alert.alert("Task Completed! ✅", message);
 
-      // Reset states
       setProofModalVisible(false);
       setCapturedImage(null);
       setSelectedTaskId(null);
@@ -315,7 +278,7 @@ const TasksScreen = ({ route }: any) => {
       "Clear Completed Tasks",
       `Are you sure you want to delete ${completedCount} completed task${
         completedCount > 1 ? "s" : ""
-      }? This action cannot be undone.`,
+      }?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -325,13 +288,10 @@ const TasksScreen = ({ route }: any) => {
             try {
               await api.tasks.deleteCompleted();
               await fetchTasks();
-              Alert.alert("Success", "Completed tasks deleted successfully!");
+              Alert.alert("Success", "Completed tasks deleted!");
             } catch (error: any) {
               console.error("Error deleting completed tasks:", error);
-              Alert.alert(
-                "Error",
-                error.message || "Failed to delete completed tasks"
-              );
+              Alert.alert("Error", error.message || "Failed to delete");
             }
           },
         },
@@ -351,7 +311,6 @@ const TasksScreen = ({ route }: any) => {
   }, []);
 
   const groupTasksByDate = () => {
-    // Filter by selected habit if one is selected
     const filteredTasks = selectedHabitFilter
       ? tasks.filter((t) => t.habit_id === selectedHabitFilter)
       : tasks;
@@ -373,56 +332,77 @@ const TasksScreen = ({ route }: any) => {
     );
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const dateStr = date.toDateString();
+    if (dateStr === today.toDateString()) return "Today";
+    if (dateStr === tomorrow.toDateString()) return "Tomorrow";
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+    });
+  };
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Tasks</Text>
-          {route?.params?.habitName && (
-            <Text style={{ fontSize: 14, color: "#6B7280", marginTop: 4 }}>
-              for {route.params.habitName}
-            </Text>
-          )}
-        </View>
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: "#EF4444" }]}
-            onPress={handleClearCompleted}
-          >
-            <Text style={styles.addButtonText}>🗑️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setModalVisible(true)}
-          >
-            <Text style={styles.addButtonText}>+</Text>
-          </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Tasks</Text>
+            {route?.params?.habitName && (
+              <Text style={styles.headerSubtitle}>
+                for {route.params.habitName}
+              </Text>
+            )}
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.headerButton, { backgroundColor: "#EF444420" }]}
+              onPress={handleClearCompleted}
+            >
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setModalVisible(true)}
+            >
+              <Ionicons name="add" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
+      
 
       {/* Habit Filter */}
       <ScrollView
         horizontal
-        style={{ maxHeight: 50, marginBottom: 10 }}
+        style={styles.filterContainer}
+        contentContainerStyle={styles.filterContent}
         showsHorizontalScrollIndicator={false}
       >
         <TouchableOpacity
           style={[
-            {
-              padding: 8,
-              paddingHorizontal: 16,
-              margin: 5,
-              borderRadius: 20,
-              backgroundColor: !selectedHabitFilter ? "#3B82F6" : "#E5E7EB",
-            },
+            styles.filterChip,
+            !selectedHabitFilter && styles.filterChipActive,
           ]}
           onPress={() => setSelectedHabitFilter(null)}
         >
+          <Ionicons
+            name="list"
+            size={16}
+            color={!selectedHabitFilter ? "#FFF" : COLORS.textLight}
+          />
           <Text
-            style={{
-              color: !selectedHabitFilter ? "white" : "#6B7280",
-              fontWeight: "600",
-            }}
+            style={[
+              styles.filterChipText,
+              !selectedHabitFilter && styles.filterChipTextActive,
+            ]}
           >
             All Tasks
           </Text>
@@ -431,22 +411,23 @@ const TasksScreen = ({ route }: any) => {
           <TouchableOpacity
             key={habit.id}
             style={[
-              {
-                padding: 8,
-                paddingHorizontal: 16,
-                margin: 5,
-                borderRadius: 20,
-                backgroundColor:
-                  selectedHabitFilter === habit.id ? "#3B82F6" : "#E5E7EB",
-              },
+              styles.filterChip,
+              selectedHabitFilter === habit.id && styles.filterChipActive,
             ]}
             onPress={() => setSelectedHabitFilter(habit.id)}
           >
+            <Ionicons
+              name="repeat"
+              size={16}
+              color={
+                selectedHabitFilter === habit.id ? "#FFF" : COLORS.textLight
+              }
+            />
             <Text
-              style={{
-                color: selectedHabitFilter === habit.id ? "white" : "#6B7280",
-                fontWeight: "600",
-              }}
+              style={[
+                styles.filterChipText,
+                selectedHabitFilter === habit.id && styles.filterChipTextActive,
+              ]}
             >
               {habit.title}
             </Text>
@@ -455,86 +436,175 @@ const TasksScreen = ({ route }: any) => {
       </ScrollView>
 
       <ScrollView
-        style={styles.taskList}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
         }
       >
-        {groupTasksByDate().map(([date, dateTasks]) => (
-          <View key={date}>
-            <Text style={styles.dateHeader}>{date}</Text>
-            {dateTasks.map((task) => (
-              <TouchableOpacity
-                key={task.id}
-                style={[
-                  styles.taskCard,
-                  { opacity: task.is_completed ? 0.6 : 1 },
-                ]}
-                onPress={() =>
-                  !task.is_completed && handleCompleteTask(task.id)
-                }
-                disabled={task.is_completed}
-              >
-                <View style={styles.taskHeader}>
-                  <Text
-                    style={[
-                      styles.taskTitle,
-                      task.is_completed && styles.completedText,
-                    ]}
-                  >
-                    {task.title}
-                  </Text>
-                  <Text style={styles.xpReward}>+{task.xp_reward} XP</Text>
-                </View>
-                {task.description && (
-                  <Text style={styles.taskDescription}>{task.description}</Text>
-                )}
-                {task.is_completed && (
-                  <View style={styles.completedBadge}>
-                    <Text style={styles.completedBadgeText}>✓ Done</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+        {tasks.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyText}>No tasks yet</Text>
+            <Text style={styles.emptySubtext}>
+              Create your first task to get started!
+            </Text>
           </View>
-        ))}
-        {tasks.length === 0 && (
-          <Text style={styles.emptyText}>
-            No tasks yet. Create your first task!{" "}
-          </Text>
+        ) : (
+          groupTasksByDate().map(([date, dateTasks]) => (
+            <View key={date} style={styles.dateSection}>
+              <View style={styles.dateBadge}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.dateText}>{formatDate(date)}</Text>
+                <Text style={styles.dateCount}>({dateTasks.length})</Text>
+              </View>
+
+              {dateTasks.map((task) => (
+                <TouchableOpacity
+                  key={task.id}
+                  style={[
+                    styles.taskCard,
+                    task.is_completed && styles.taskCardCompleted,
+                  ]}
+                  onPress={() =>
+                    !task.is_completed && handleCompleteTask(task.id)
+                  }
+                  disabled={task.is_completed}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.taskIconContainer}>
+                    <View
+                      style={[
+                        styles.taskIcon,
+                        {
+                          backgroundColor: task.is_completed
+                            ? `${COLORS.success}20`
+                            : `${COLORS.primary}20`,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={
+                          task.is_completed
+                            ? "checkmark-circle"
+                            : "checkbox-outline"
+                        }
+                        size={24}
+                        color={
+                          task.is_completed ? COLORS.success : COLORS.primary
+                        }
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.taskContent}>
+                    <Text
+                      style={[
+                        styles.taskTitle,
+                        task.is_completed && styles.taskTitleCompleted,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {task.title}
+                    </Text>
+                    {task.description && (
+                      <Text style={styles.taskDescription} numberOfLines={2}>
+                        {task.description}
+                      </Text>
+                    )}
+
+                    <View style={styles.taskFooter}>
+                      <View style={styles.xpBadge}>
+                        <Ionicons
+                          name="flash"
+                          size={14}
+                          color={COLORS.warning}
+                        />
+                        <Text style={styles.xpText}>+{task.xp_reward} XP</Text>
+                      </View>
+
+                      {task.is_completed && (
+                        <View style={styles.completedBadge}>
+                          <Ionicons
+                            name="checkmark"
+                            size={14}
+                            color={COLORS.success}
+                          />
+                          <Text style={styles.completedText}>Done</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {!task.is_completed && (
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={COLORS.textMuted}
+                      style={styles.taskArrow}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))
         )}
       </ScrollView>
 
+      {/* Create Task Modal */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create New Task</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create New Task</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Task Title"
-              value={newTask.title}
-              onChangeText={(text) => setNewTask({ ...newTask, title: text })}
-            />
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={[styles.inputLabel, styles.firstInputLabel]}>Task Title *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter task title"
+                placeholderTextColor={COLORS.textMuted}
+                value={newTask.title}
+                onChangeText={(text) => setNewTask({ ...newTask, title: text })}
+                autoFocus={false}
+              />
 
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Description (optional)"
-              value={newTask.description}
-              onChangeText={(text) =>
-                setNewTask({ ...newTask, description: text })
-              }
-              multiline
-              numberOfLines={3}
-            />
+              <Text style={styles.inputLabel}>Description</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Enter description (optional)"
+                placeholderTextColor={COLORS.textMuted}
+                value={newTask.description}
+                onChangeText={(text) =>
+                  setNewTask({ ...newTask, description: text })
+                }
+                multiline
+                numberOfLines={3}
+              />
 
-            <Text style={styles.label}>Select Habit (Optional):</Text>
-            <ScrollView style={styles.habitsList}>
+              <Text style={styles.inputLabel}>Select Habit</Text>
               <TouchableOpacity
                 style={[
                   styles.habitOption,
@@ -542,15 +612,21 @@ const TasksScreen = ({ route }: any) => {
                 ]}
                 onPress={() => setNewTask({ ...newTask, habitId: "" })}
               >
+                <Ionicons
+                  name="star-outline"
+                  size={20}
+                  color={!newTask.habitId ? COLORS.primary : COLORS.textLight}
+                />
                 <Text
                   style={[
                     styles.habitOptionText,
                     !newTask.habitId && styles.habitOptionTextSelected,
                   ]}
                 >
-                  ⭐ None (Standalone Task)
+                  None (Standalone Task)
                 </Text>
               </TouchableOpacity>
+
               {habits.map((habit) => (
                 <TouchableOpacity
                   key={habit.id}
@@ -560,6 +636,15 @@ const TasksScreen = ({ route }: any) => {
                   ]}
                   onPress={() => setNewTask({ ...newTask, habitId: habit.id })}
                 >
+                  <Ionicons
+                    name="repeat"
+                    size={20}
+                    color={
+                      newTask.habitId === habit.id
+                        ? COLORS.primary
+                        : COLORS.textLight
+                    }
+                  />
                   <Text
                     style={[
                       styles.habitOptionText,
@@ -571,44 +656,52 @@ const TasksScreen = ({ route }: any) => {
                   </Text>
                 </TouchableOpacity>
               ))}
+
+              <View style={styles.row}>
+                <View style={styles.halfInput}>
+                  <Text style={styles.inputLabel}>XP Reward</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="50"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newTask.xpReward}
+                    onChangeText={(text) =>
+                      setNewTask({
+                        ...newTask,
+                        xpReward: text.replace(/[^0-9]/g, ""),
+                      })
+                    }
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.halfInput}>
+                  <Text style={styles.inputLabel}>Scheduled For</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newTask.scheduledFor}
+                    onChangeText={(text) =>
+                      setNewTask({ ...newTask, scheduledFor: text })
+                    }
+                  />
+                </View>
+              </View>
             </ScrollView>
 
-            <Text style={styles.label}>XP Reward:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="XP Reward"
-              value={newTask.xpReward}
-              onChangeText={(text) =>
-                setNewTask({
-                  ...newTask,
-                  xpReward: text.replace(/[^0-9]/g, ""),
-                })
-              }
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.label}>Scheduled For:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={newTask.scheduledFor}
-              onChangeText={(text) =>
-                setNewTask({ ...newTask, scheduledFor: text })
-              }
-            />
-
-            <View style={styles.modalButtons}>
+            <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.button, styles.createButton]}
+                style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateTask}
               >
-                <Text style={styles.createButtonText}>Create</Text>
+                <Text style={styles.createButtonText}>Create Task</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -625,52 +718,85 @@ const TasksScreen = ({ route }: any) => {
           setCapturedImage(null);
         }}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.proofModalContent}>
-            <Text style={styles.modalTitle}>Proof Photo Required 📸</Text>
-            <Text style={styles.proofNote}>
-              Photo verification is mandatory to complete this task. Your photo
-              will be saved to your device and automatically deleted from our
-              server after 90 minutes for privacy.
-            </Text>
-
-            {capturedImage ? (
-              <View style={styles.imagePreviewContainer}>
-                <Image
-                  source={{ uri: capturedImage }}
-                  style={styles.imagePreview}
-                />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => setCapturedImage(null)}
-                >
-                  <Text style={styles.removeImageText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.photoOptions}>
-                <TouchableOpacity
-                  style={styles.photoButton}
-                  onPress={takePhoto}
-                >
-                  <Text style={styles.photoButtonIcon}>📷</Text>
-                  <Text style={styles.photoButtonText}>Take Photo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.photoButton}
-                  onPress={pickImage}
-                >
-                  <Text style={styles.photoButtonIcon}>🖼️</Text>
-                  <Text style={styles.photoButtonText}>
-                    Choose from Gallery
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={styles.modalButtons}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Proof Photo Required 📸</Text>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setProofModalVisible(false);
+                  setCapturedImage(null);
+                }}
+              >
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <View style={styles.proofInfo}>
+                <Ionicons
+                  name="information-circle"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.proofInfoText}>
+                  Photo verification is mandatory to complete tasks. Your photo
+                  will be saved to your device and automatically deleted from
+                  our server after 90 minutes for privacy.
+                </Text>
+              </View>
+
+              {capturedImage ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image
+                    source={{ uri: capturedImage }}
+                    style={styles.imagePreview}
+                  />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setCapturedImage(null)}
+                  >
+                    <Ionicons name="close-circle" size={32} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.photoOptions}>
+                  <TouchableOpacity
+                    style={styles.photoButton}
+                    onPress={takePhoto}
+                  >
+                    <View style={styles.photoButtonIcon}>
+                      <Ionicons
+                        name="camera"
+                        size={32}
+                        color={COLORS.primary}
+                      />
+                    </View>
+                    <Text style={styles.photoButtonText}>Take Photo</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.photoButton}
+                    onPress={pickImage}
+                  >
+                    <View style={styles.photoButtonIcon}>
+                      <Ionicons
+                        name="images"
+                        size={32}
+                        color={COLORS.secondary}
+                      />
+                    </View>
+                    <Text style={styles.photoButtonText}>
+                      Choose from Gallery
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setProofModalVisible(false);
                   setCapturedImage(null);
@@ -681,21 +807,408 @@ const TasksScreen = ({ route }: any) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.button,
+                  styles.modalButton,
                   styles.createButton,
                   !capturedImage && styles.disabledButton,
                 ]}
                 onPress={submitProofAndComplete}
                 disabled={!capturedImage}
               >
+                <Ionicons name="checkmark" size={20} color="#FFF" />
                 <Text style={styles.createButtonText}>Submit & Complete</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  header: {
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.l,
+    paddingHorizontal: SPACING.l,
+    backgroundColor: COLORS.background,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: COLORS.text,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    marginTop: 4,
+  },
+  
+  headerActions: {
+    flexDirection: "row",
+    gap: SPACING.s,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterContainer: {
+    maxHeight: 70,
+    backgroundColor: COLORS.background,
+  },
+  filterContent: {
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.m,
+    gap: SPACING.s,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.s,
+    paddingHorizontal: SPACING.m,
+    paddingVertical: SPACING.s,
+    borderRadius: RADIUS.xl,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterChipText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textLight,
+  },
+  filterChipTextActive: {
+    color: "#FFF",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: SPACING.l,
+  },
+  emptyContainer: {
+    paddingVertical: SPACING.xl * 2,
+    alignItems: "center",
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: SPACING.m,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.textLight,
+    marginBottom: SPACING.s,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: "center",
+  },
+  dateSection: {
+    marginBottom: SPACING.l,
+  },
+  dateBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.s,
+    marginBottom: SPACING.m,
+    paddingHorizontal: SPACING.s,
+  },
+  dateText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: COLORS.text,
+  },
+  dateCount: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+  },
+  taskCard: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: RADIUS.m,
+    padding: SPACING.m,
+    marginBottom: SPACING.m,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  taskCardCompleted: {
+    opacity: 0.6,
+  },
+  taskIconContainer: {
+    marginRight: SPACING.m,
+  },
+  taskIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  taskContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 4,
+    flexShrink: 1,
+    flexWrap: "wrap",
+  },
+  taskTitleCompleted: {
+    textDecorationLine: "line-through",
+    color: COLORS.textLight,
+  },
+  taskDescription: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    marginBottom: SPACING.s,
+    flexShrink: 1,
+    flexWrap: "wrap",
+  },
+  taskFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.s,
+  },
+  xpBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: `${COLORS.warning}20`,
+    paddingHorizontal: SPACING.s,
+    paddingVertical: 4,
+    borderRadius: RADIUS.s,
+  },
+  xpText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.warning,
+  },
+  completedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: `${COLORS.success}20`,
+    paddingHorizontal: SPACING.s,
+    paddingVertical: 4,
+    borderRadius: RADIUS.s,
+  },
+  completedText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.success,
+  },
+  taskArrow: {
+    marginLeft: SPACING.s,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContainer: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: RADIUS.l,
+    borderTopRightRadius: RADIUS.l,
+    maxHeight: "85%",
+    minHeight: "50%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: SPACING.l,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: COLORS.text,
+    flexShrink: 1,
+    marginRight: SPACING.s,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: SPACING.l,
+    paddingBottom: SPACING.xl,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: SPACING.s,
+    marginTop: SPACING.m,
+  },
+  firstInputLabel: {
+    marginTop: 0,
+  },
+  input: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: RADIUS.m,
+    padding: SPACING.m,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  habitOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.m,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: RADIUS.m,
+    padding: SPACING.m,
+    marginBottom: SPACING.s,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  habitOptionSelected: {
+    backgroundColor: `${COLORS.primary}20`,
+    borderColor: COLORS.primary,
+  },
+  habitOptionText: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    flex: 1,
+    flexShrink: 1,
+    flexWrap: "wrap",
+  },
+  habitOptionTextSelected: {
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  row: {
+    flexDirection: "row",
+    gap: SPACING.m,
+  },
+  halfInput: {
+    flex: 1,
+  },
+  modalFooter: {
+    flexDirection: "row",
+    gap: SPACING.m,
+    padding: SPACING.l,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+  },
+  modalButton: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: SPACING.s,
+    padding: SPACING.m,
+    borderRadius: RADIUS.m,
+  },
+  cancelButton: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  createButton: {
+    backgroundColor: COLORS.primary,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFF",
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  proofInfo: {
+    flexDirection: "row",
+    gap: SPACING.m,
+    backgroundColor: `${COLORS.primary}20`,
+    padding: SPACING.m,
+    borderRadius: RADIUS.m,
+    marginBottom: SPACING.l,
+  },
+  proofInfoText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.textLight,
+    lineHeight: 20,
+    flexShrink: 1,
+  },
+  imagePreviewContainer: {
+    position: "relative",
+    marginBottom: SPACING.l,
+  },
+  imagePreview: {
+    width: "100%",
+    height: 300,
+    borderRadius: RADIUS.m,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: SPACING.m,
+    right: SPACING.m,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 16,
+  },
+  photoOptions: {
+    flexDirection: "row",
+    gap: SPACING.m,
+    marginBottom: SPACING.l,
+  },
+  photoButton: {
+    flex: 1,
+    alignItems: "center",
+    padding: SPACING.l,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: RADIUS.m,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  photoButtonIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: `${COLORS.primary}20`,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.m,
+  },
+  photoButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+    textAlign: "center",
+  },
+});
 
 export default TasksScreen;

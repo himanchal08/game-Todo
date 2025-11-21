@@ -6,8 +6,11 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
+  Dimensions,
 } from "react-native";
 import api from "../services/api";
+
+const { width } = Dimensions.get("window");
 import styles from "../styles/screens/HomeScreen.styles";
 
 interface Task {
@@ -30,6 +33,7 @@ const HomeScreen = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const fetchTodayTasks = async () => {
     try {
@@ -48,6 +52,8 @@ const HomeScreen = () => {
     } catch (error: any) {
       console.error("Error fetching profile:", error);
       Alert.alert("Error", error.message || "Failed to fetch profile");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -185,9 +191,20 @@ const HomeScreen = () => {
           </TouchableOpacity>
         ))}
         {tasks.length === 0 && (
-          <Text style={styles.emptyText}>
-            No tasks for today! Create one to get started 🎯
-          </Text>
+          <View style={{ padding: 40, alignItems: "center" }}>
+            <Text style={{ fontSize: 48, marginBottom: 16 }}>📋</Text>
+            <Text style={[styles.emptyText, { textAlign: "center" }]}>
+              No tasks for today!
+            </Text>
+            <Text
+              style={[
+                styles.emptyText,
+                { fontSize: 14, color: "#A1A1AA", marginTop: 8 },
+              ]}
+            >
+              Go to Tasks screen to create your first task
+            </Text>
+          </View>
         )}
       </ScrollView>
     </View>

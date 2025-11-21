@@ -10,12 +10,18 @@ import { useAuth } from "../contexts/AuthContext";
 import LoginScreen from "../screens/auth/LoginScreen";
 import SignupScreen from "../screens/auth/SignupScreen";
 import HomeScreen from "../screens/HomeScreen";
+import DashboardScreen from "../screens/DashboardScreen";
 import HabitsScreen from "../screens/HabitsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import TasksScreen from "../screens/TasksScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import BadgesScreen from "../screens/BadgesScreen";
 import XPHistoryScreen from "../screens/XPHistoryScreen";
+import AnalyticsScreen from "../screens/AnalyticsScreen";
+import ProofUploadScreen from "../screens/ProofUploadScreen";
+
+// Import custom tab bar
+import CustomTabBar from "../components/CustomTabBar";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -23,52 +29,16 @@ const Tab = createBottomTabNavigator();
 const TabNavigator = () => {
   return (
     <Tab.Navigator
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: "#3B82F6",
-        tabBarInactiveTintColor: "gray",
         headerShown: false,
       }}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Tasks"
-        component={TasksScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="checkbox-marked"
-              color={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Habits"
-        component={HabitsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="repeat" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" color={color} size={size} />
-          ),
-        }}
-      />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Habits" component={HabitsScreen} />
+      <Tab.Screen name="Create" component={TasksScreen} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };
@@ -97,6 +67,19 @@ export const AppNavigator = () => {
           // Main App Stack
           <>
             <Stack.Screen name="MainApp" component={TabNavigator} />
+            <Stack.Screen
+              name="Tasks"
+              component={TasksScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ProofUpload"
+              component={ProofUploadScreen}
+              options={{
+                headerShown: false,
+                presentation: "modal",
+              }}
+            />
             <Stack.Screen
               name="Notifications"
               component={NotificationsScreen}

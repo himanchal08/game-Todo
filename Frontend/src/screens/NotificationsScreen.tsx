@@ -1,3 +1,7 @@
+/**
+ * Notifications Screen - Modern Redesign
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,9 +10,17 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
-import styles from "../styles/screens/NotificationsScreen.styles";
+import { COLORS, SPACING, RADIUS } from "../theme";
+
+const { width } = Dimensions.get("window");
 
 interface Notification {
   id: string;
@@ -53,7 +65,7 @@ const NotificationsScreen = () => {
     try {
       await api.notifications.markAllAsRead();
       setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
-      Alert.alert("Success", "All notifications marked as read");
+      Alert.alert("Success", "All notifications marked as read ✓");
     } catch (error: any) {
       console.error("Error marking all as read:", error);
       Alert.alert("Error", error.message || "Failed to mark all as read");
@@ -77,10 +89,7 @@ const NotificationsScreen = () => {
               );
             } catch (error: any) {
               console.error("Error deleting notification:", error);
-              Alert.alert(
-                "Error",
-                error.message || "Failed to delete notification"
-              );
+              Alert.alert("Error", error.message || "Failed to delete");
             }
           },
         },
@@ -98,20 +107,45 @@ const NotificationsScreen = () => {
     fetchNotifications();
   }, []);
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string): any => {
     switch (type) {
       case "xp_earned":
-        return "⭐";
+        return "flash";
       case "level_up":
-        return "🎉";
+        return "arrow-up-circle";
       case "badge_earned":
-        return "🏆";
+        return "trophy";
       case "streak_milestone":
-        return "🔥";
+        return "flame";
       case "reminder":
-        return "⏰";
+        return "notifications";
+      case "task_complete":
+        return "checkmark-circle";
+      case "habit_reminder":
+        return "repeat";
       default:
-        return "📢";
+        return "information-circle";
+    }
+  };
+
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case "xp_earned":
+        return COLORS.warning;
+      case "level_up":
+        return "#8B5CF6";
+      case "badge_earned":
+        return "#FBB024";
+      case "streak_milestone":
+        return "#F97316";
+      case "reminder":
+        return COLORS.primary;
+      case "task_complete":
+        return COLORS.success;
+      case "habit_reminder":
+        return COLORS.secondary;
+      default:
+        return COLORS.textMuted;
     }
   };
 
@@ -126,94 +160,306 @@ const NotificationsScreen = () => {
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    
+    return date.toLocaleDateString("en-US", { 
+      month: "short", 
+      day: "numeric" 
+    });
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>Loading notifications...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={styles.headerSubtitle}>Stay updated</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Notifications</Text>
-        {unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount}</Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Stay Updated</Text>
+            
           </View>
-        )}
+          {unreadCount > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {notifications.length > 0 && unreadCount > 0 && (
-        <TouchableOpacity
-          style={styles.markAllButton}
-          onPress={handleMarkAllAsRead}
-        >
-          <Text style={styles.markAllButtonText}>Mark All as Read</Text>
-        </TouchableOpacity>
+        <View style={styles.actionBar}>
+          <TouchableOpacity
+            style={styles.markAllButton}
+            onPress={handleMarkAllAsRead}
+          >
+            <Ionicons name="checkmark-done" size={18} color={COLORS.primary} />
+            <Text style={styles.markAllButtonText}>Mark All as Read</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <ScrollView
-        style={styles.list}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
         }
       >
         {notifications.length === 0 ? (
-          <Text style={styles.emptyText}>No notifications yet 📭</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📭</Text>
+            <Text style={styles.emptyText}>No notifications yet</Text>
+            <Text style={styles.emptySubtext}>
+              You'll see updates about your tasks and achievements here
+            </Text>
+          </View>
         ) : (
-          notifications.map((notification) => (
-            <TouchableOpacity
-              key={notification.id}
-              style={[
-                styles.notificationCard,
-                !notification.is_read && styles.unreadCard,
-              ]}
-              onPress={() =>
-                !notification.is_read && handleMarkAsRead(notification.id)
-              }
-            >
-              <View style={styles.notificationContent}>
-                <Text style={styles.notificationIcon}>
-                  {getNotificationIcon(notification.type)}
-                </Text>
-                <View style={styles.notificationText}>
+          notifications.map((notification) => {
+            const iconName = getNotificationIcon(notification.type);
+            const iconColor = getNotificationColor(notification.type);
+
+            return (
+              <TouchableOpacity
+                key={notification.id}
+                style={[
+                  styles.notificationCard,
+                  !notification.is_read && styles.notificationCardUnread,
+                ]}
+                onPress={() =>
+                  !notification.is_read && handleMarkAsRead(notification.id)
+                }
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.notificationIcon,
+                    { backgroundColor: `${iconColor}20` },
+                  ]}
+                >
+                  <Ionicons name={iconName} size={24} color={iconColor} />
+                </View>
+
+                <View style={styles.notificationContent}>
                   <Text
                     style={[
                       styles.notificationTitle,
-                      !notification.is_read && styles.unreadTitle,
+                      !notification.is_read && styles.notificationTitleUnread,
                     ]}
+                    numberOfLines={1}
                   >
                     {notification.title}
                   </Text>
-                  <Text style={styles.notificationMessage}>
+                  <Text style={styles.notificationMessage} numberOfLines={2}>
                     {notification.message}
                   </Text>
-                  <Text style={styles.notificationDate}>
+                  <Text style={styles.notificationTime}>
                     {formatDate(notification.created_at)}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(notification.id)}
-                >
-                  <Text style={styles.deleteButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              {!notification.is_read && <View style={styles.unreadIndicator} />}
-            </TouchableOpacity>
-          ))
+
+                <View style={styles.notificationActions}>
+                  {!notification.is_read && (
+                    <View style={styles.unreadDot} />
+                  )}
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDelete(notification.id)}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={20}
+                      color={COLORS.textMuted}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  header: {
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.l,
+    paddingHorizontal: SPACING.l,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: COLORS.text,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    marginTop: 4,
+  },
+  unreadBadge: {
+    backgroundColor: "#EF4444",
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  unreadBadgeText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#FFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: COLORS.textLight,
+    marginTop: SPACING.m,
+    fontSize: 16,
+  },
+  actionBar: {
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.m,
+    backgroundColor: COLORS.background,
+  },
+  markAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.s,
+    backgroundColor: `${COLORS.primary}20`,
+    paddingVertical: SPACING.s,
+    paddingHorizontal: SPACING.m,
+    borderRadius: RADIUS.m,
+  },
+  markAllButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: SPACING.l,
+  },
+  emptyContainer: {
+    paddingVertical: SPACING.xl * 2,
+    alignItems: "center",
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: SPACING.m,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.textLight,
+    marginBottom: SPACING.s,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: "center",
+    paddingHorizontal: SPACING.xl,
+  },
+  notificationCard: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: RADIUS.m,
+    padding: SPACING.m,
+    marginBottom: SPACING.m,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  notificationCardUnread: {
+    borderColor: `${COLORS.primary}40`,
+    backgroundColor: `${COLORS.primary}05`,
+  },
+  notificationIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: SPACING.m,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 4,
+    flexShrink: 1,
+  },
+  notificationTitleUnread: {
+    color: COLORS.text,
+    fontWeight: "700",
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    lineHeight: 20,
+    marginBottom: 4,
+    flexShrink: 1,
+  },
+  notificationTime: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  notificationActions: {
+    alignItems: "center",
+    gap: SPACING.s,
+    marginLeft: SPACING.s,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
+  },
+  deleteButton: {
+    padding: 4,
+  },
+});
 
 export default NotificationsScreen;

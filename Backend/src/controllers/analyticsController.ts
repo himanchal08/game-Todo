@@ -138,9 +138,11 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     ]);
 
     res.json({
-      statistics: stats,
+      stats: stats,
+      statistics: stats, // Keep for backward compatibility
       heatmap,
       recent_badges: badges.slice(0, 5),
+      badges: badges.slice(0, 5), // Keep for backward compatibility
       total_badges: badges.length,
     });
   } catch (error: any) {

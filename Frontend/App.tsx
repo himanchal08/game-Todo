@@ -66,7 +66,11 @@ async function registerForPushNotificationsAsync() {
 
       console.log("✅ Push notification token:", token);
     } catch (error) {
-      console.error("Error getting push token:", error);
+      // Silently fail - push notifications require valid Expo project ID
+      // They will work once the app is rebuilt with proper configuration
+      console.log(
+        "⚠️ Push notifications disabled (requires rebuild with valid project ID)"
+      );
     }
   } else {
     console.log("Must use physical device for Push Notifications");
