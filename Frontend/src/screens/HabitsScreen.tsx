@@ -42,6 +42,11 @@ const HabitsScreen = ({ navigation }: any) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [streaks, setStreaks] = useState<Streak[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<any | null>(null);
+  const [editedSubtasks, setEditedSubtasks] = useState<any[]>([]);
+  const [currentAiHabitId, setCurrentAiHabitId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [newHabit, setNewHabit] = useState({
     name: "",
@@ -150,11 +155,40 @@ const HabitsScreen = ({ navigation }: any) => {
                 </Text>
               </View>
             </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={COLORS.textLight}
-            />
+            <View style={styles.rightActions}>
+              <TouchableOpacity
+                style={styles.aiButton}
+                onPress={async () => {
+                  try {
+                    setAiLoading(true);
+                    setCurrentAiHabitId(item.id);
+                    const resp = await habitsService.breakdown(item.id, { maxParts: 6 });
+                    setAiResult(resp);
+                    const subs = (resp.subtasks || []).map((s: any) => ({
+                      title: s.title || "",
+                      description: s.description || "",
+                      estimatedMinutes: s.estimatedMinutes || s.estimated_minutes || 10,
+                      suggestedXp: s.suggestedXp || s.suggested_xp || 0,
+                    }));
+                    setEditedSubtasks(subs);
+                    setAiModalVisible(true);
+                  } catch (e: any) {
+                    console.error("AI habit breakdown failed", e);
+                    Alert.alert("Error", e.message || "AI breakdown failed");
+                  } finally {
+                    setAiLoading(false);
+                  }
+                }}
+              >
+                <Ionicons name="bulb-outline" size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={COLORS.textLight}
+              />
+            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -298,6 +332,115 @@ const HabitsScreen = ({ navigation }: any) => {
           </View>
         </View>
       </Modal>
+
+      {/* AI Breakdown Modal for Habits */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={aiModalVisible}
+        onRequestClose={() => setAiModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>AI Habit Breakdown</Text>
+              <TouchableOpacity onPress={() => setAiModalVisible(false)}>
+                <Ionicons name="close" size={28} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {aiLoading && <Text style={{ color: COLORS.textMuted }}>Generating suggestions...</Text>}
+
+              {!aiLoading && aiResult && (
+                <View>
+                  {aiResult.aiSummary ? (
+                    <View style={{ marginBottom: SPACING.m }}>
+                      <Text style={styles.label}>AI Summary</Text>
+                      <Text style={{ color: COLORS.textLight }}>{aiResult.aiSummary}</Text>
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.label}>Suggested Tasks</Text>
+                  {editedSubtasks.map((st, idx) => (
+                    <View key={idx} style={{ marginBottom: SPACING.m }}>
+                      <Text style={{ fontWeight: "600", color: COLORS.text }}>Step {idx + 1}</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={st.title}
+                        onChangeText={(text) => {
+                          const copy = [...editedSubtasks];
+                          copy[idx].title = text;
+                          setEditedSubtasks(copy);
+                        }}
+                        placeholder="Task title"
+                        placeholderTextColor={COLORS.textLight}
+                      />
+                      <TextInput
+                        style={[styles.input, styles.textArea]}
+                        value={st.description}
+                        onChangeText={(text) => {
+                          const copy = [...editedSubtasks];
+                          copy[idx].description = text;
+                          setEditedSubtasks(copy);
+                        }}
+                        placeholder="Description (optional)"
+                        placeholderTextColor={COLORS.textLight}
+                        multiline
+                        numberOfLines={2}
+                      />
+                      <View style={{ flexDirection: "row", gap: SPACING.m }}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          value={String(st.estimatedMinutes)}
+                          onChangeText={(text) => {
+                            const copy = [...editedSubtasks];
+                            copy[idx].estimatedMinutes = Number(text.replace(/[^0-9]/g, "")) || 0;
+                            setEditedSubtasks(copy);
+                          }}
+                          placeholder="Minutes"
+                          keyboardType="numeric"
+                        />
+
+                        <View style={[styles.input, { justifyContent: "center" }]}> 
+                          <Text style={{ color: COLORS.text }}>XP: {st.suggestedXp || 0}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <BouncyButton style={styles.cancelButton} onPress={() => setAiModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </BouncyButton>
+              <BouncyButton
+                style={styles.createButton}
+                onPress={async () => {
+                  try {
+                    if (!currentAiHabitId) return;
+                    const body = { subtasks: editedSubtasks.map(s => ({ title: s.title, description: s.description, estimatedMinutes: s.estimatedMinutes, suggestedXp: s.suggestedXp })), applyXp: true };
+                    const resp = await habitsService.acceptBreakdown(currentAiHabitId, body);
+                    Alert.alert("Success", `Created ${resp.subtasks?.length || 0} tasks. XP awarded: ${resp.xpAwarded || 0}`);
+                    setAiModalVisible(false);
+                    setEditedSubtasks([]);
+                    setAiResult(null);
+                    setCurrentAiHabitId(null);
+                    await fetchHabits();
+                  } catch (e: any) {
+                    console.error("Accept AI habit breakdown failed", e);
+                    Alert.alert("Error", e.message || "Failed to create tasks");
+                  }
+                }}
+              >
+                <Text style={styles.createButtonText}>Create Tasks</Text>
+              </BouncyButton>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -374,6 +517,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textLight,
     marginTop: 4,
+  },
+  rightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.s,
+  },
+  aiButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    marginRight: SPACING.s,
   },
   streakRow: {
     flexDirection: "row",

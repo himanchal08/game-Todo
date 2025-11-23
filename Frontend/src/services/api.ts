@@ -190,6 +190,33 @@ export const habitsAPI = {
 
     return response.json();
   },
+  breakdown: async (habitId: string, params: { maxParts?: number; targetTimeMinutes?: number } = {}) => {
+    const response = await authenticatedFetch(`/api/habits/${habitId}/breakdown`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to get AI breakdown for habit");
+    }
+
+    return response.json();
+  },
+
+  acceptBreakdown: async (habitId: string, body: { subtasks: any[]; applyXp?: boolean }) => {
+    const response = await authenticatedFetch(`/api/habits/${habitId}/breakdown/accept`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to accept AI habit breakdown");
+    }
+
+    return response.json();
+  },
 };
 
 // ============================================
