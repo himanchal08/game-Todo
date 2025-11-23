@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { Calendar } from "react-native-calendars";
 import { analyticsService } from "../services/api";
 import { COLORS, SPACING, RADIUS } from "../theme";
 
@@ -60,15 +61,40 @@ const AnalyticsScreen = () => {
     try {
       const response = await analyticsService.getHeatmap(days);
       const heatmap = response.heatmap || response.data || [];
-      // Map backend data to frontend format
-      const mappedData = heatmap.map((day: any) => ({
-        date: day.date,
-        count: day.tasks_completed || 0,
-        xp: day.xp_earned || 0,
-      }));
-      setHeatmapData(mappedData);
+
+      // Create a map of existing data
+      const dataMap = new Map();
+      heatmap.forEach((day: any) => {
+        dataMap.set(day.date, {
+          date: day.date,
+          count: day.tasks_completed || 0,
+          xp: day.xp_earned || 0,
+        });
+      });
+
+      // Fill in all dates for the period (going backwards from today)
+      const allDates: HeatmapDay[] = [];
+      const today = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split("T")[0];
+
+        if (dataMap.has(dateStr)) {
+          allDates.push(dataMap.get(dateStr));
+        } else {
+          allDates.push({
+            date: dateStr,
+            count: 0,
+            xp: 0,
+          });
+        }
+      }
+
+      setHeatmapData(allDates);
     } catch (error: any) {
       console.error("Error fetching heatmap:", error);
+      setHeatmapData([]);
     }
   };
 
@@ -117,41 +143,6 @@ const AnalyticsScreen = () => {
     );
   };
 
-  const renderHeatmapWeek = (weekData: HeatmapDay[], weekIndex: number) => {
-    const cellSize = (width - SPACING.l * 2 - SPACING.s * 6) / 7;
-    const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
-
-    return (
-      <View key={weekIndex} style={styles.heatmapWeek}>
-        {weekData.map((day, index) => {
-          const date = new Date(day.date);
-          const dayOfWeek = date.getDay();
-          const dayLabel = dayNames[dayOfWeek];
-
-          return (
-            <View key={index} style={styles.heatmapCellContainer}>
-              <View
-                style={[
-                  styles.heatmapCell,
-                  {
-                    width: cellSize,
-                    height: cellSize,
-                    backgroundColor: getHeatmapColor(day.count),
-                  },
-                ]}
-              >
-                <Text style={styles.heatmapCellText}>{day.count || ""}</Text>
-              </View>
-              {weekIndex === 0 && (
-                <Text style={styles.dayLabel}>{dayLabel}</Text>
-              )}
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
-
   const renderHeatmap = () => {
     if (heatmapData.length === 0) {
       return (
@@ -164,16 +155,45 @@ const AnalyticsScreen = () => {
       );
     }
 
-    // Group data into weeks (7 days each)
-    const weeks: HeatmapDay[][] = [];
-    for (let i = 0; i < heatmapData.length; i += 7) {
-      weeks.push(heatmapData.slice(i, i + 7));
+    // Convert heatmap data to Calendar's markedDates format
+    const markedDates: any = {};
+
+    heatmapData.forEach((day) => {
+      if (day.date) {
+        const color = getHeatmapColor(day.count);
+        markedDates[day.date] = {
+          marked: day.count > 0,
+          customStyles: {
+            container: {
+              backgroundColor: color,
+              borderRadius: 6,
+            },
+            text: {
+              color: day.count > 0 ? COLORS.text : COLORS.textLight,
+              fontWeight: day.count > 0 ? "bold" : "normal",
+            },
+          },
+        };
+      }
+    });
+
+    // Mark today with special styling
+    const today = new Date().toISOString().split("T")[0];
+    if (markedDates[today]) {
+      markedDates[today] = {
+        ...markedDates[today],
+        selected: true,
+        selectedColor: COLORS.primary,
+      };
+    } else {
+      markedDates[today] = {
+        selected: true,
+        selectedColor: COLORS.primary,
+      };
     }
 
     return (
       <View style={styles.heatmapContainer}>
-        {weeks.map((week, index) => renderHeatmapWeek(week, index))}
-
         <View style={styles.heatmapLegend}>
           <Text style={styles.legendText}>Less</Text>
           <View style={styles.legendColors}>
@@ -206,6 +226,30 @@ const AnalyticsScreen = () => {
             />
           </View>
           <Text style={styles.legendText}>More</Text>
+        </View>
+
+        <View style={{ width: width - SPACING.l * 2 }}>
+          <Calendar
+            markingType="custom"
+            markedDates={markedDates}
+            theme={{
+              backgroundColor: COLORS.backgroundSecondary,
+              calendarBackground: COLORS.backgroundSecondary,
+              textSectionTitleColor: COLORS.textLight,
+              selectedDayBackgroundColor: COLORS.primary,
+              selectedDayTextColor: "#ffffff",
+              todayTextColor: COLORS.primary,
+              dayTextColor: COLORS.text,
+              textDisabledColor: COLORS.textMuted,
+              monthTextColor: COLORS.text,
+              textMonthFontWeight: "bold",
+              textDayFontSize: 13,
+              textMonthFontSize: 16,
+              textDayHeaderFontSize: 11,
+            }}
+            style={styles.calendar}
+            enableSwipeMonths={true}
+          />
         </View>
       </View>
     );
@@ -506,37 +550,87 @@ const styles = StyleSheet.create({
     padding: SPACING.m,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
+    maxHeight: 450,
   },
-  heatmapWeek: {
+  monthContainer: {
+    marginBottom: SPACING.l,
+  },
+  monthTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: COLORS.text,
+    marginBottom: SPACING.m,
+    textAlign: "center",
+  },
+  dayHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: SPACING.s,
   },
-  heatmapCellContainer: {
+  dayHeader: {
     alignItems: "center",
   },
-  heatmapCell: {
+  dayHeaderText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textLight,
+  },
+  calendarWeek: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  calendarCell: {
     borderRadius: RADIUS.s,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    position: "relative",
   },
-  heatmapCellText: {
+  dateNumber: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  countBadge: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  countBadgeText: {
     fontSize: 10,
     fontWeight: "bold",
-    color: COLORS.text,
+    color: "#FFF",
   },
-  dayLabel: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    marginTop: 2,
+  todayCell: {
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  todayText: {
+    color: COLORS.primary,
+    fontWeight: "bold",
+  },
+  monthsScroll: {
+    maxHeight: 350,
+    marginTop: SPACING.m,
   },
   heatmapLegend: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: SPACING.m,
     gap: SPACING.s,
+    paddingBottom: SPACING.s,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
   legendText: {
     fontSize: 12,
@@ -568,6 +662,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textMuted,
     textAlign: "center",
+  },
+  calendar: {
+    borderRadius: RADIUS.m,
+    marginTop: SPACING.m,
   },
   insightCard: {
     backgroundColor: COLORS.backgroundSecondary,

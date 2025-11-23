@@ -17,7 +17,7 @@ router.post("/", createTask);
 router.get("/today", getTodayTasks);
 router.post("/:id/complete", completeTask);
 router.get("/habit/:habitId", getTasksByHabit);
-router.delete("/:id", deleteTask);
 router.delete("/completed", deleteCompletedTasks);
+router.delete("/:id", deleteTask);
 
 export default router;
