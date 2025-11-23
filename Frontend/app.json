@@ -4,7 +4,7 @@
     "slug": "game-todo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Disciplo_Logo.png",
+    "icon": "./assets/playstore.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "extra": {
@@ -13,13 +13,13 @@
       }
     },
     "notification": {
-      "icon": "./assets/Disciplo_Logo.png",
+      "icon": "./assets/playstore.png",
       "color": "#3B82F6",
       "androidMode": "default",
       "androidCollapsedTitle": "#{unread_notifications} new notifications"
     },
     "splash": {
-      "image": "./assets/Disciplo_Logo.png",
+      "image": "./assets/playstore.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },

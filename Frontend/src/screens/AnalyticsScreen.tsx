@@ -347,47 +347,10 @@ const AnalyticsScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Activity Heatmap</Text>
-
-            <View style={styles.periodSelector}>
-              <TouchableOpacity
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === 30 && styles.periodButtonActive,
-                ]}
-                onPress={() => setSelectedPeriod(30)}
-              >
-                <Text
-                  style={[
-                    styles.periodButtonText,
-                    selectedPeriod === 30 && styles.periodButtonTextActive,
-                  ]}
-                >
-                  30d
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === 90 && styles.periodButtonActive,
-                ]}
-                onPress={() => setSelectedPeriod(90)}
-              >
-                <Text
-                  style={[
-                    styles.periodButtonText,
-                    selectedPeriod === 90 && styles.periodButtonTextActive,
-                  ]}
-                >
-                  90d
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {renderHeatmap()}
         </View>
-
         {/* Insights */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Insights</Text>
@@ -522,28 +485,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
-  periodSelector: {
-    flexDirection: "row",
-    backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: RADIUS.s,
-    padding: 4,
-  },
-  periodButton: {
-    paddingHorizontal: SPACING.m,
-    paddingVertical: SPACING.s,
-    borderRadius: RADIUS.s,
-  },
-  periodButtonActive: {
-    backgroundColor: COLORS.primary,
-  },
-  periodButtonText: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    fontWeight: "600",
-  },
-  periodButtonTextActive: {
-    color: "#FFF",
-  },
+  
   heatmapContainer: {
     backgroundColor: COLORS.backgroundSecondary,
     borderRadius: RADIUS.m,
@@ -666,6 +608,7 @@ const styles = StyleSheet.create({
   calendar: {
     borderRadius: RADIUS.m,
     marginTop: SPACING.m,
+    marginRight: SPACING.xl,
   },
   insightCard: {
     backgroundColor: COLORS.backgroundSecondary,
