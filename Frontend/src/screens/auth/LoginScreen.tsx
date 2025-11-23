@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   Dimensions,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -66,18 +67,21 @@ const LoginScreen = ({ navigation }: any) => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         {/* Logo Section */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoIcon}>
-            <Ionicons name="flash" size={32} color={COLORS.primary} />
-          </View>
+          <Image
+            source={require("../../../assets/Disciplo_Logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.logoText}>Disciplo</Text>
           <Text style={styles.subtitle}>Build Your Legacy</Text>
         </View>
@@ -88,7 +92,12 @@ const LoginScreen = ({ navigation }: any) => {
           <Text style={styles.description}>Login to continue your journey</Text>
 
           <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+            <Ionicons
+              name="mail-outline"
+              size={20}
+              color={COLORS.textMuted}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={styles.input}
               placeholder="Email"
@@ -102,7 +111,12 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+            <Ionicons
+              name="lock-closed-outline"
+              size={20}
+              color={COLORS.textMuted}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={styles.input}
               placeholder="Password"
@@ -121,7 +135,11 @@ const LoginScreen = ({ navigation }: any) => {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={loading ? [COLORS.backgroundTertiary, COLORS.backgroundTertiary] : [COLORS.primary, "#8B5CF6"]}
+              colors={
+                loading
+                  ? [COLORS.backgroundTertiary, COLORS.backgroundTertiary]
+                  : [COLORS.primary, "#8B5CF6"]
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.buttonGradient}
@@ -160,24 +178,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
     padding: SPACING.l,
-    paddingVertical: SPACING.xl * 2,
+    paddingTop: SPACING.xl * 3,
+    paddingBottom: SPACING.xl * 2,
   },
   logoContainer: {
     alignItems: "center",
     marginBottom: SPACING.xl * 2,
   },
-  logoIcon: {
-    width: 72,
-    height: 72,
-    backgroundColor: COLORS.backgroundSecondary,
-    borderRadius: RADIUS.l,
-    alignItems: "center",
-    justifyContent: "center",
+  logoImage: {
+    width: 80,
+    height: 80,
     marginBottom: SPACING.m,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   logoText: {
     fontSize: 28,
@@ -269,6 +281,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-
 
 export default LoginScreen;
