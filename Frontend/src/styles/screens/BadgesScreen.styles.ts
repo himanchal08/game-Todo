@@ -12,7 +12,7 @@ export const badgesScreenStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: "transparent",
   },
 
   header: {
@@ -20,6 +20,7 @@ export const badgesScreenStyles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: spacing.lg,
+    backgroundColor: "transparent",
   },
 
   title: {
