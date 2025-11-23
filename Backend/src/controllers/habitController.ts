@@ -1,6 +1,8 @@
 import { Response } from "express";
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { AuthRequest } from "../middlewares/authMiddleware";
+import { generateTaskBreakdown } from "../services/aiService";
+import { logUserActivity } from "../services/analyticsService";
 
 export const createHabit = async (req: AuthRequest, res: Response) => {
   try {
@@ -149,5 +151,133 @@ export const deleteHabit = async (req: AuthRequest, res: Response) => {
     res.json({ message: "Habit deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// AI Breakdown for habit (returns suggested subtasks as tasks)
+export const habitAiBreakdown = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const { data: habit, error: habitErr } = await supabaseAdmin
+      .from("habits")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .single();
+
+    if (habitErr || !habit) {
+      return res.status(404).json({ error: "Habit not found" });
+    }
+
+    const { maxParts, targetTimeMinutes } = req.body || {};
+
+    const aiResult = await generateTaskBreakdown({
+      title: habit.title || habit.name,
+      description: habit.description || "",
+      maxParts: Number(maxParts) || 6,
+      targetTimeMinutes: Number(targetTimeMinutes) || undefined,
+    });
+
+    res.json({ habitId: id, ...aiResult });
+  } catch (error: any) {
+    console.error("Habit AI breakdown error:", error);
+    res.status(500).json({ error: error.message || "AI breakdown failed" });
+  }
+};
+
+// Accept AI breakdown for habit: create tasks linked to the habit
+export const acceptHabitBreakdown = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params; // habit id
+    const userId = req.user?.id;
+    const { subtasks, applyXp } = req.body || {};
+
+    if (!Array.isArray(subtasks) || subtasks.length === 0) {
+      return res.status(400).json({ error: "subtasks array is required" });
+    }
+
+    const { data: habit, error: habitErr } = await supabaseAdmin
+      .from("habits")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .single();
+
+    if (habitErr || !habit) {
+      return res.status(404).json({ error: "Habit not found" });
+    }
+
+    const now = new Date().toISOString();
+    const rows = subtasks.map((st: any) => ({
+      habit_id: id,
+      user_id: userId,
+      title: st.title,
+      description: st.description || "",
+      xp_reward: st.suggestedXp || st.xp || 0,
+      created_at: now,
+      due_date: null,
+    }));
+
+    const { data: inserted, error: insertErr } = await supabaseAdmin
+      .from("tasks")
+      .insert(rows)
+      .select();
+
+    if (insertErr) {
+      console.error("Error inserting habit subtasks:", insertErr);
+      return res.status(500).json({ error: insertErr.message });
+    }
+
+    let xpAwarded = 0;
+    if (applyXp) {
+      const xpRows = (inserted || []).map((t: any) => ({
+        user_id: userId,
+        task_id: t.id,
+        amount: t.xp_reward || 0,
+        source: "ai_habit_subtask",
+        description: `AI suggested habit subtask: ${t.title}`,
+        created_at: now,
+      }));
+
+      const { data: xpInserted, error: xpErr } = await supabaseAdmin
+        .from("xp_logs")
+        .insert(xpRows)
+        .select();
+
+      if (!xpErr && xpInserted) {
+        xpAwarded = xpInserted.reduce((s: number, x: any) => s + (x.amount || 0), 0);
+
+        const { data: profile, error: profileErr } = await supabaseAdmin
+          .from("profiles")
+          .select("total_xp")
+          .eq("id", userId)
+          .single();
+
+        if (!profileErr && profile) {
+          const newTotalXp = (profile.total_xp || 0) + xpAwarded;
+          const newLevel = Math.floor(newTotalXp / 100) + 1;
+          await supabaseAdmin
+            .from("profiles")
+            .update({ total_xp: newTotalXp, level: newLevel })
+            .eq("id", userId);
+        }
+      }
+    }
+
+    try {
+      if (inserted && inserted.length) {
+        await logUserActivity(userId!, "task", inserted.length);
+      }
+      if (xpAwarded) await logUserActivity(userId!, "xp", xpAwarded);
+    } catch (e) {
+      console.warn("Analytics logging failed", e);
+    }
+
+    return res.status(201).json({ subtasks: inserted, xpAwarded });
+  } catch (error: any) {
+    console.error("acceptHabitBreakdown error:", error);
+    return res.status(500).json({ error: error.message || "Failed to accept AI habit breakdown" });
   }
 };
