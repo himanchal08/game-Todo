@@ -209,6 +209,7 @@ export const acceptHabitBreakdown = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Habit not found" });
     }
 
+    const todayDate = new Date().toISOString().split("T")[0];
     const now = new Date().toISOString();
     const rows = subtasks.map((st: any) => ({
       habit_id: id,
@@ -217,7 +218,7 @@ export const acceptHabitBreakdown = async (req: AuthRequest, res: Response) => {
       description: st.description || "",
       xp_reward: st.suggestedXp || st.xp || 0,
       created_at: now,
-      due_date: null,
+      due_date: st.due_date || st.scheduled_for || todayDate,
     }));
 
     const { data: inserted, error: insertErr } = await supabaseAdmin

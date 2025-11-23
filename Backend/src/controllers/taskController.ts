@@ -252,6 +252,7 @@ export const acceptAiBreakdown = async (req: AuthRequest, res: Response) => {
 
     // Prepare rows for insertion
     const now = new Date().toISOString();
+    const parentDue = parentTask.due_date || parentTask.scheduled_for || new Date().toISOString().split("T")[0];
     const rows = subtasks.map((st: any) => ({
       parent_task_id: id,
       user_id: userId,
@@ -259,7 +260,7 @@ export const acceptAiBreakdown = async (req: AuthRequest, res: Response) => {
       description: st.description || "",
       xp_reward: st.suggestedXp || st.xp || 0,
       created_at: now,
-      due_date: null,
+      due_date: st.due_date || st.scheduled_for || parentDue,
     }));
 
     // Insert subtasks
