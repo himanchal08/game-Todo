@@ -81,4 +81,10 @@ app.listen(PORT, "0.0.0.0", () => {
 
   // Start proof cleanup scheduler (deletes photos after 90 minutes)
   startProofCleanupScheduler();
+
+  // Seed badge definitions (only runs if badges don't exist)
+  const { seedBadgeDefinitions } = require("./utils/seedBadges");
+  seedBadgeDefinitions().catch((err: any) =>
+    console.error("Failed to seed badges:", err)
+  );
 });

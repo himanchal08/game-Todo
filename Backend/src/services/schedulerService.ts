@@ -210,7 +210,7 @@ export const scheduleMidDayBoost = () => {
 
 /**
  * Send evening reflection to users
- * Runs daily at 8 PM
+ * Runs daily at 8 PM and 10 PM
  */
 export const scheduleEveningReflection = () => {
   const {
@@ -219,7 +219,8 @@ export const scheduleEveningReflection = () => {
   } = require("./motivationalMessages");
   const { sendMotivationalMessage } = require("./notificationService");
 
-  cron.schedule("0 20 * * *", async () => {
+  // Run at 8 PM and 10 PM
+  cron.schedule("0 20,22 * * *", async () => {
     try {
       // Get users who have evening reflection enabled
       const { data: preferences } = await supabaseAdmin

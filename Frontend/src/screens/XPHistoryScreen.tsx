@@ -59,11 +59,22 @@ const XPHistoryScreen = () => {
 
   useEffect(() => {
     fetchXPHistory();
-  }, []);
+
+    // Refresh XP history when screen comes into focus
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchXPHistory();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerStyle: { backgroundColor: COLORS.background, shadowColor: "transparent", elevation: 0 },
+      headerStyle: {
+        backgroundColor: COLORS.background,
+        shadowColor: "transparent",
+        elevation: 0,
+      },
       headerTintColor: COLORS.text,
     });
   }, [navigation]);

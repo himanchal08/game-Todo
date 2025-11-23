@@ -18,7 +18,6 @@ export const createTask = async (req: AuthRequest, res: Response) => {
     } = req.body;
     const userId = req.user?.id;
 
-
     const taskHabitId = habitId || habit_id || null;
 
     const taskDueDate = scheduled_for || dueDate;
@@ -131,35 +130,85 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
       .update({ total_xp: newTotalXp, level: newLevel })
       .eq("id", userId);
 
-    // Update streak - use admin client
+    // Update streak for ALL task completions
     const today = new Date().toISOString().split("T")[0];
-    const { data: streak } = await supabaseAdmin
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    // Update habit-specific streak if task is linked to a habit
+    if (task.habit_id) {
+      const { data: habitStreak } = await supabaseAdmin
+        .from("streaks")
+        .select("*")
+        .eq("habit_id", task.habit_id)
+        .eq("user_id", userId)
+        .single();
+
+      if (habitStreak) {
+        const lastDate = habitStreak.last_completed_date;
+        let newStreak = habitStreak.current_streak;
+        const oldStreak = habitStreak.current_streak;
+
+        if (lastDate === yesterdayStr) {
+          newStreak = habitStreak.current_streak + 1;
+        } else if (lastDate === today) {
+          newStreak = habitStreak.current_streak;
+        } else {
+          newStreak = 1;
+        }
+
+        const newLongest = Math.max(newStreak, habitStreak.longest_streak);
+
+        await supabaseAdmin
+          .from("streaks")
+          .update({
+            current_streak: newStreak,
+            longest_streak: newLongest,
+            last_completed_date: today,
+          })
+          .eq("id", habitStreak.id);
+
+        // Send milestone notifications for habit streaks at 3, 7, 14, 30, 50, 100 days
+        const milestones = [3, 7, 14, 30, 50, 100];
+        if (newStreak > oldStreak && milestones.includes(newStreak)) {
+          const {
+            sendStreakMilestone,
+          } = require("../services/notificationService");
+          const { data: habit } = await supabaseAdmin
+            .from("habits")
+            .select("title")
+            .eq("id", task.habit_id)
+            .single();
+
+          await sendStreakMilestone(userId, newStreak, habit?.title);
+        }
+      }
+    }
+
+    // Update or create general "Daily Tasks" streak for all users
+    const { data: generalStreak } = await supabaseAdmin
       .from("streaks")
       .select("*")
-      .eq("habit_id", task.habit_id)
       .eq("user_id", userId)
+      .is("habit_id", null)
       .single();
 
-    if (streak) {
-      const lastDate = streak.last_completed_date;
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-      let newStreak = streak.current_streak;
+    if (generalStreak) {
+      // Update existing general streak
+      const lastDate = generalStreak.last_completed_date;
+      let newStreak = generalStreak.current_streak;
+      const oldStreak = generalStreak.current_streak;
 
       if (lastDate === yesterdayStr) {
-        // Consecutive day
-        newStreak = streak.current_streak + 1;
+        newStreak = generalStreak.current_streak + 1;
       } else if (lastDate === today) {
-        // Already completed today
-        newStreak = streak.current_streak;
+        newStreak = generalStreak.current_streak;
       } else {
-        // Streak broken, restart
         newStreak = 1;
       }
 
-      const newLongest = Math.max(newStreak, streak.longest_streak);
+      const newLongest = Math.max(newStreak, generalStreak.longest_streak);
 
       await supabaseAdmin
         .from("streaks")
@@ -168,12 +217,34 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
           longest_streak: newLongest,
           last_completed_date: today,
         })
-        .eq("id", streak.id);
+        .eq("id", generalStreak.id);
+
+      // Send milestone notifications for general task streak at 3, 7, 14, 30, 50, 100 days
+      const milestones = [3, 7, 14, 30, 50, 100];
+      if (newStreak > oldStreak && milestones.includes(newStreak)) {
+        const {
+          sendStreakMilestone,
+        } = require("../services/notificationService");
+        await sendStreakMilestone(userId, newStreak);
+      }
+    } else {
+      // Create new general streak
+      await supabaseAdmin.from("streaks").insert({
+        user_id: userId,
+        habit_id: null,
+        current_streak: 1,
+        longest_streak: 1,
+        last_completed_date: today,
+      });
     }
 
     // Log activity for analytics
     await logUserActivity(userId!, "task", 1);
     await logUserActivity(userId!, "xp", task.xp_reward);
+
+    // Update user statistics for badge checking
+    const { updateUserStatistics } = require("../services/analyticsService");
+    await updateUserStatistics(userId!);
 
     // Check for new badges
     const newBadges = await checkAndAwardBadges(userId!);
@@ -189,7 +260,6 @@ export const completeTask = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 export const getTasksByHabit = async (req: AuthRequest, res: Response) => {
   try {

@@ -17,6 +17,7 @@ import {
 const { width } = Dimensions.get("window");
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { habitsService, streaksService } from "../services/api";
 import { BouncyButton } from "../components/ui";
 import { COLORS, SPACING, RADIUS } from "../theme";
@@ -38,7 +39,8 @@ interface Streak {
   last_completed: string;
 }
 
-const HabitsScreen = ({ navigation }: any) => {
+const HabitsScreen = ({ navigation: screenNavigation }: any) => {
+  const navigation = useNavigation();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [streaks, setStreaks] = useState<Streak[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -168,7 +170,14 @@ const HabitsScreen = ({ navigation }: any) => {
   useEffect(() => {
     fetchHabits();
     fetchStreaks();
-  }, []);
+
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchHabits();
+      fetchStreaks();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const renderHabit = ({ item }: { item: Habit }) => {
     const streak = getStreakForHabit(item.id);

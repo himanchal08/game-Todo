@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { supabase } from "../services/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
@@ -45,7 +46,8 @@ interface Streak {
   last_completed: string;
 }
 
-const ProfileScreen = ({ navigation }: any) => {
+const ProfileScreen = ({ navigation: screenNavigation }: any) => {
+  const navigation = useNavigation();
   const { session, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -112,7 +114,16 @@ const ProfileScreen = ({ navigation }: any) => {
         setLoading(false)
       );
     }
-  }, [authLoading, session]);
+
+    // Refresh profile when screen comes into focus
+    const unsubscribe = navigation.addListener("focus", () => {
+      if (!authLoading && session?.user) {
+        Promise.all([fetchProfile(), fetchStats(), fetchStreaks()]);
+      }
+    });
+
+    return unsubscribe;
+  }, [authLoading, session, navigation]);
 
   if (authLoading || loading) {
     return (

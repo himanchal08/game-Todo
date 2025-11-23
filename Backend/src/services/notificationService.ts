@@ -206,3 +206,28 @@ export const sendMotivationalMessage = async (
     type: "motivation",
   });
 };
+
+/**
+ * Send streak milestone notification
+ */
+export const sendStreakMilestone = async (
+  userId: string,
+  streakCount: number,
+  habitName?: string
+) => {
+  const title = habitName
+    ? `🔥 ${streakCount}-Day Streak!`
+    : `🔥 ${streakCount} Days Strong!`;
+
+  const body = habitName
+    ? `Amazing! You've maintained your ${habitName} streak for ${streakCount} consecutive days!`
+    : `You're on fire! ${streakCount} consecutive days of completing tasks. Keep it up!`;
+
+  return sendPushNotification({
+    userId,
+    title,
+    body,
+    data: { type: "streak_milestone", streak: streakCount, habit: habitName },
+    type: "streak_milestone",
+  });
+};

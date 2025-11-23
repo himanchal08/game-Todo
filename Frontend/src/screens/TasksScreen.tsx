@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import api from "../services/api";
@@ -41,6 +42,7 @@ interface Habit {
 }
 
 const TasksScreen = ({ route }: any) => {
+  const navigation = useNavigation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -387,7 +389,14 @@ const TasksScreen = ({ route }: any) => {
   useEffect(() => {
     fetchTasks();
     fetchHabits();
-  }, []);
+
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchTasks();
+      fetchHabits();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const groupTasksByDate = () => {
     const filteredTasks = selectedHabitFilter

@@ -69,12 +69,22 @@ const BadgesScreen = () => {
 
   useEffect(() => {
     fetchBadges();
-  }, []);
+
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchBadges();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   useLayoutEffect(() => {
     // make native header match app background
     navigation.setOptions({
-      headerStyle: { backgroundColor: COLORS.background, shadowColor: "transparent", elevation: 0 },
+      headerStyle: {
+        backgroundColor: COLORS.background,
+        shadowColor: "transparent",
+        elevation: 0,
+      },
       headerTintColor: COLORS.text,
     });
   }, [navigation]);

@@ -17,6 +17,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Calendar } from "react-native-calendars";
+import { useNavigation } from "@react-navigation/native";
 import { analyticsService } from "../services/api";
 import { COLORS, SPACING, RADIUS } from "../theme";
 
@@ -42,6 +43,7 @@ interface HeatmapDay {
 }
 
 const AnalyticsScreen = () => {
+  const navigation = useNavigation();
   const [stats, setStats] = useState<Stats | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -112,7 +114,14 @@ const AnalyticsScreen = () => {
 
   useEffect(() => {
     loadData();
-  }, [selectedPeriod]);
+
+    // Refresh analytics when screen comes into focus
+    const unsubscribe = navigation.addListener("focus", () => {
+      loadData();
+    });
+
+    return unsubscribe;
+  }, [selectedPeriod, navigation]);
 
   const getHeatmapColor = (count: number) => {
     if (count === 0) return COLORS.backgroundTertiary;
@@ -485,7 +494,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
-  
+
   heatmapContainer: {
     backgroundColor: COLORS.backgroundSecondary,
     borderRadius: RADIUS.m,
