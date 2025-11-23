@@ -46,8 +46,9 @@
       ],
       "package": "com.anonymous.Frontend",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#3B82F6"
+        "foregroundImage": "./assets/Disciplo_Logo.png",
+        "monochromeImage": "./assets/Disciplo_Logo.png",
+        "backgroundColor": "#1E293B"
       }
     },
     "plugins": [
