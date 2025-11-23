@@ -15,7 +15,12 @@
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.77.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/morgan": "^1.9.10",
     "@types/multer": "^2.0.0",
+    "@types/node": "^24.9.2",
+    "@types/node-cron": "^3.0.11",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "expo-server-sdk": "^4.0.0",
@@ -28,20 +33,15 @@
     "node-cron": "^4.2.1",
     "openai": "^4.104.0",
     "posthog-node": "^5.11.0",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.5",
-    "@types/morgan": "^1.9.10",
-    "@types/node": "^24.9.2",
-    "@types/node-cron": "^3.0.11",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
     "eslint": "^9.38.0",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "ts-node": "^10.9.2"
   }
 }
