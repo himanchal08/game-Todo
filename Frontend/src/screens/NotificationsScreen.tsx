@@ -1,7 +1,3 @@
-/**
- * Notifications Screen - Modern Redesign
- */
-
 import React, { useState, useEffect, useLayoutEffect } from "react";
 import {
   View,

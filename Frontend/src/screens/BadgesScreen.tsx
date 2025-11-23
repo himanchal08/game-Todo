@@ -1,9 +1,4 @@
-<<<<<<< HEAD
-
 import React, { useState, useEffect, useLayoutEffect } from "react";
-=======
-import React, { useState, useEffect } from "react";
->>>>>>> c2e3056752ebc7b89975e00b4ae05669ae464905
 import {
   View,
   Text,
