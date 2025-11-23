@@ -45,6 +45,11 @@ const TasksScreen = ({ route }: any) => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [proofModalVisible, setProofModalVisible] = useState(false);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<any | null>(null);
+  const [editedSubtasks, setEditedSubtasks] = useState<any[]>([]);
+  const [currentAiTaskId, setCurrentAiTaskId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -76,6 +81,14 @@ const TasksScreen = ({ route }: any) => {
     } catch (error: any) {
       console.error("Error fetching habits:", error);
     }
+  };
+
+  // Local XP preview to show in modal (keep consistent with backend formula)
+  const computeXpPreview = (estimatedMinutes: number, difficultyScore = 5) => {
+    const baseXPPerMinute = 0.2;
+    const difficultyMultiplier = 1 + (difficultyScore - 5) / 5;
+    const raw = (estimatedMinutes || 0) * baseXPPerMinute * difficultyMultiplier;
+    return Math.max(1, Math.round(raw));
   };
 
   const handleCreateTask = async () => {
@@ -545,12 +558,41 @@ const TasksScreen = ({ route }: any) => {
                   </View>
 
                   {!task.is_completed && (
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color={COLORS.textMuted}
-                      style={styles.taskArrow}
-                    />
+                    <View style={styles.rightActions}>
+                      <TouchableOpacity
+                        style={styles.aiButton}
+                        onPress={async () => {
+                          try {
+                            setAiLoading(true);
+                            setCurrentAiTaskId(task.id);
+                            const resp = await api.tasks.breakdown(task.id, { maxParts: 6 });
+                            setAiResult(resp);
+                            const subs = (resp.subtasks || []).map((s: any) => ({
+                              title: s.title || "",
+                              description: s.description || "",
+                              estimatedMinutes: s.estimatedMinutes || s.estimated_minutes || 10,
+                              suggestedXp: s.suggestedXp || s.suggested_xp || s.suggestedXp || 0,
+                            }));
+                            setEditedSubtasks(subs);
+                            setAiModalVisible(true);
+                          } catch (e: any) {
+                            console.error("AI breakdown failed", e);
+                            Alert.alert("Error", e.message || "AI breakdown failed");
+                          } finally {
+                            setAiLoading(false);
+                          }
+                        }}
+                      >
+                        <Ionicons name="bulb-outline" size={20} color={COLORS.primary} />
+                      </TouchableOpacity>
+
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={COLORS.textMuted}
+                        style={styles.taskArrow}
+                      />
+                    </View>
                   )}
                 </TouchableOpacity>
               ))}
@@ -821,6 +863,121 @@ const TasksScreen = ({ route }: any) => {
           </View>
         </View>
       </Modal>
+
+      {/* AI Breakdown Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={aiModalVisible}
+        onRequestClose={() => setAiModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>AI Task Breakdown</Text>
+              <TouchableOpacity onPress={() => setAiModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+              {aiLoading && (
+                <Text style={{ color: COLORS.textMuted }}>Generating suggestions...</Text>
+              )}
+
+              {!aiLoading && aiResult && (
+                <View>
+                  {aiResult.aiSummary ? (
+                    <View style={{ marginBottom: SPACING.m }}>
+                      <Text style={[styles.inputLabel]}>AI Summary</Text>
+                      <Text style={{ color: COLORS.textLight }}>{aiResult.aiSummary}</Text>
+                    </View>
+                  ) : null}
+
+                  <Text style={[styles.inputLabel]}>Suggested Subtasks</Text>
+
+                  {editedSubtasks.map((st, idx) => (
+                    <View key={idx} style={{ marginBottom: SPACING.m }}>
+                      <Text style={{ fontWeight: "600", color: COLORS.text }}>Step {idx + 1}</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={st.title}
+                        onChangeText={(text) => {
+                          const copy = [...editedSubtasks];
+                          copy[idx].title = text;
+                          setEditedSubtasks(copy);
+                        }}
+                        placeholder="Subtask title"
+                        placeholderTextColor={COLORS.textMuted}
+                      />
+                      <TextInput
+                        style={[styles.input, styles.textArea]}
+                        value={st.description}
+                        onChangeText={(text) => {
+                          const copy = [...editedSubtasks];
+                          copy[idx].description = text;
+                          setEditedSubtasks(copy);
+                        }}
+                        placeholder="Description (optional)"
+                        placeholderTextColor={COLORS.textMuted}
+                        multiline
+                        numberOfLines={2}
+                      />
+                      <View style={{ flexDirection: "row", gap: SPACING.m }}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          value={String(st.estimatedMinutes)}
+                          onChangeText={(text) => {
+                            const copy = [...editedSubtasks];
+                            copy[idx].estimatedMinutes = Number(text.replace(/[^0-9]/g, "")) || 0;
+                            setEditedSubtasks(copy);
+                          }}
+                          placeholder="Minutes"
+                          keyboardType="numeric"
+                        />
+
+                        <View style={[styles.input, { justifyContent: "center" }]}> 
+                          <Text style={{ color: COLORS.text }}>XP: {st.suggestedXp || computeXpPreview(st.estimatedMinutes)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setAiModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={async () => {
+                  try {
+                    if (!currentAiTaskId) return;
+                    const body = { subtasks: editedSubtasks.map(s => ({ title: s.title, description: s.description, estimatedMinutes: s.estimatedMinutes, suggestedXp: s.suggestedXp })), applyXp: true };
+                    const resp = await api.tasks.acceptBreakdown(currentAiTaskId, body);
+                    Alert.alert("Success", `Created ${resp.subtasks?.length || 0} subtasks. XP awarded: ${resp.xpAwarded || 0}`);
+                    setAiModalVisible(false);
+                    setEditedSubtasks([]);
+                    setAiResult(null);
+                    setCurrentAiTaskId(null);
+                    await fetchTasks();
+                  } catch (e: any) {
+                    console.error("Accept AI breakdown failed", e);
+                    Alert.alert("Error", e.message || "Failed to create subtasks");
+                  }
+                }}
+              >
+                <Text style={styles.createButtonText}>Create Subtasks</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1021,6 +1178,20 @@ const styles = StyleSheet.create({
   },
   taskArrow: {
     marginLeft: SPACING.s,
+  },
+  rightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.s,
+  },
+  aiButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    marginRight: SPACING.s,
   },
   modalOverlay: {
     flex: 1,
