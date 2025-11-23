@@ -9,8 +9,14 @@
     "newArchEnabled": true,
     "extra": {
       "eas": {
-        "projectId": "not-required-for-dev"
+        "projectId": "38be567e-32b1-4c08-a4b9-54bb05176ad7"
       }
+    },
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#3B82F6",
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new notifications"
     },
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -18,13 +24,31 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.Frontend",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
-      "permissions": ["NOTIFICATIONS", "VIBRATE", "NOTIFICATIONS", "VIBRATE"],
-      "package": "com.anonymous.Frontend"
+      "permissions": [
+        "android.permission.NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.Frontend",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#3B82F6"
+      }
     },
     "plugins": [
       [
@@ -52,6 +76,7 @@
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "owner": "himanchal08"
   }
 }
