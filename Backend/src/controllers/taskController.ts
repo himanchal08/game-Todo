@@ -18,15 +18,12 @@ export const createTask = async (req: AuthRequest, res: Response) => {
     } = req.body;
     const userId = req.user?.id;
 
-    // Support both habitId and habit_id for flexibility
-    // habit_id is optional - tasks can be standalone or linked to habits
+
     const taskHabitId = habitId || habit_id || null;
 
-    // Support both frontend (scheduled_for, xp_reward) and backend (dueDate, xpReward) naming
     const taskDueDate = scheduled_for || dueDate;
     const taskXpReward = xp_reward || xpReward || 10;
 
-    // Use admin client to bypass RLS
     const { data, error } = await supabaseAdmin
       .from("tasks")
       .insert({

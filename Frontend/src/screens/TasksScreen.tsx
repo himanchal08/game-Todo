@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,28 +18,126 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import api from "../services/api";
-      {/* Task-level AI breakdown removed — keep habit-level AI intact */}
-    );
+import { COLORS, SPACING, RADIUS } from "../theme";
+
+const { width } = Dimensions.get("window");
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  scheduled_for: string;
+  completed: boolean;
+  is_completed: boolean;
+  xp_reward: number;
+  habit_id?: string;
+}
+
+interface Habit {
+  id: string;
+  name: string;
+  title: string;
+  frequency: string;
+}
+
+const TasksScreen = ({ route }: any) => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [proofModalVisible, setProofModalVisible] = useState(false);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<any | null>(null);
+  const [editedSubtasks, setEditedSubtasks] = useState<any[]>([]);
+  const [currentAiTaskId, setCurrentAiTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [selectedHabitFilter, setSelectedHabitFilter] = useState<string | null>(
+    route?.params?.habitId || null
+  );
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    habitId: route?.params?.habitId || "",
+    scheduledFor: new Date().toISOString().split("T")[0],
+    xpReward: "50",
+  });
+
+  const fetchTasks = async () => {
+    try {
+      const response = await api.tasks.getTodayTasks();
+      setTasks(response.tasks || []);
+    } catch (error: any) {
+      console.error("Error fetching tasks:", error);
+      Alert.alert("Error", error.message || "Failed to fetch tasks");
+    }
   };
 
-  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
+  const fetchHabits = async () => {
+    try {
+      const response = await api.habits.getAll();
+      setHabits(response.habits || []);
+    } catch (error: any) {
+      console.error("Error fetching habits:", error);
+    }
+  };
+
+  // Local XP preview to show in modal (keep consistent with backend formula)
+  const computeXpPreview = (estimatedMinutes: number, difficultyScore = 5) => {
+    const baseXPPerMinute = 0.2;
+    const difficultyMultiplier = 1 + (difficultyScore - 5) / 5;
+    const raw = (estimatedMinutes || 0) * baseXPPerMinute * difficultyMultiplier;
+    return Math.max(1, Math.round(raw));
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) {
+      Alert.alert("Error", "Please enter a task title");
+      return;
+    }
+
+    try {
+      const taskData: any = {
+        title: newTask.title,
+        description: newTask.description,
+        xp_reward: parseInt(newTask.xpReward) || 50,
+        scheduled_for: newTask.scheduledFor,
+      };
+
+      if (newTask.habitId) {
+        taskData.habit_id = newTask.habitId;
+      }
+
+      await api.tasks.create(taskData);
+
+      setModalVisible(false);
+      setNewTask({
+        title: "",
+        description: "",
+        habitId: "",
+        scheduledFor: new Date().toISOString().split("T")[0],
+        xpReward: "50",
+      });
+
+      await fetchTasks();
+      Alert.alert("Success", "Task created successfully! 🎯");
+    } catch (error: any) {
+      console.error("Error creating task:", error);
+      Alert.alert("Error", error.message || "Failed to create task");
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
     Alert.alert(
-      "Delete Task",
-      `Are you sure you want to delete "${taskTitle}"?`,
+      "Complete Task",
+      "Please add a proof photo to complete this task. This helps verify your progress!",
       [
-        { text: "Cancel", style: "cancel" },
         {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.tasks.delete(taskId);
-              await fetchTasks();
-              Alert.alert("Success", "Task deleted successfully!");
-            } catch (error: any) {
-              console.error("Error deleting task:", error);
-              Alert.alert("Error", error.message || "Failed to delete task");
-            }
+          text: "OK",
+          onPress: () => {
+            setSelectedTaskId(taskId);
+            setProofModalVisible(true);
           },
         },
       ]
@@ -232,9 +330,7 @@ import api from "../services/api";
 
     const grouped = filteredTasks.reduce(
       (acc: { [key: string]: Task[] }, task) => {
-        // Use scheduled_for or fallback to today's date if missing
-        const date =
-          task.scheduled_for || new Date().toISOString().split("T")[0];
+        const date = task.scheduled_for;
         if (!acc[date]) {
           acc[date] = [];
         }
@@ -250,11 +346,7 @@ import api from "../services/api";
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "No Date";
-
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid Date";
-
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -298,6 +390,7 @@ import api from "../services/api";
           </View>
         </View>
       </View>
+      
 
       {/* Habit Filter */}
       <ScrollView
@@ -467,14 +560,30 @@ import api from "../services/api";
                   {!task.is_completed && (
                     <View style={styles.rightActions}>
                       <TouchableOpacity
-                        style={styles.deleteTaskButton}
-                        onPress={() => handleDeleteTask(task.id, task.title)}
+                        style={styles.aiButton}
+                        onPress={async () => {
+                          try {
+                            setAiLoading(true);
+                            setCurrentAiTaskId(task.id);
+                            const resp = await api.tasks.breakdown(task.id, { maxParts: 6 });
+                            setAiResult(resp);
+                            const subs = (resp.subtasks || []).map((s: any) => ({
+                              title: s.title || "",
+                              description: s.description || "",
+                              estimatedMinutes: s.estimatedMinutes || s.estimated_minutes || 10,
+                              suggestedXp: s.suggestedXp || s.suggested_xp || s.suggestedXp || 0,
+                            }));
+                            setEditedSubtasks(subs);
+                            setAiModalVisible(true);
+                          } catch (e: any) {
+                            console.error("AI breakdown failed", e);
+                            Alert.alert("Error", e.message || "AI breakdown failed");
+                          } finally {
+                            setAiLoading(false);
+                          }
+                        }}
                       >
-                        <Ionicons
-                          name="trash-outline"
-                          size={20}
-                          color="#EF4444"
-                        />
+                        <Ionicons name="bulb-outline" size={20} color={COLORS.primary} />
                       </TouchableOpacity>
 
                       <Ionicons
@@ -509,15 +618,12 @@ import api from "../services/api";
             </View>
 
             <ScrollView
-              ref={modalScrollRef}
               style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <Text style={[styles.inputLabel, styles.firstInputLabel]}>
-                Task Title *
-              </Text>
+              <Text style={[styles.inputLabel, styles.firstInputLabel]}>Task Title *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter task title"
@@ -668,7 +774,7 @@ import api from "../services/api";
               </TouchableOpacity>
             </View>
 
-            <ScrollView ref={proofModalScrollRef} style={styles.modalScroll}>
+            <ScrollView style={styles.modalScroll}>
               <View style={styles.proofInfo}>
                 <Ionicons
                   name="information-circle"
@@ -774,15 +880,9 @@ import api from "../services/api";
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              ref={aiModalScrollRef}
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-            >
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
               {aiLoading && (
-                <Text style={{ color: COLORS.textMuted }}>
-                  Generating suggestions...
-                </Text>
+                <Text style={{ color: COLORS.textMuted }}>Generating suggestions...</Text>
               )}
 
               {!aiLoading && aiResult && (
@@ -790,9 +890,7 @@ import api from "../services/api";
                   {aiResult.aiSummary ? (
                     <View style={{ marginBottom: SPACING.m }}>
                       <Text style={[styles.inputLabel]}>AI Summary</Text>
-                      <Text style={{ color: COLORS.textLight }}>
-                        {aiResult.aiSummary}
-                      </Text>
+                      <Text style={{ color: COLORS.textLight }}>{aiResult.aiSummary}</Text>
                     </View>
                   ) : null}
 
@@ -800,9 +898,7 @@ import api from "../services/api";
 
                   {editedSubtasks.map((st, idx) => (
                     <View key={idx} style={{ marginBottom: SPACING.m }}>
-                      <Text style={{ fontWeight: "600", color: COLORS.text }}>
-                        Step {idx + 1}
-                      </Text>
+                      <Text style={{ fontWeight: "600", color: COLORS.text }}>Step {idx + 1}</Text>
                       <TextInput
                         style={styles.input}
                         value={st.title}
@@ -833,22 +929,15 @@ import api from "../services/api";
                           value={String(st.estimatedMinutes)}
                           onChangeText={(text) => {
                             const copy = [...editedSubtasks];
-                            copy[idx].estimatedMinutes =
-                              Number(text.replace(/[^0-9]/g, "")) || 0;
+                            copy[idx].estimatedMinutes = Number(text.replace(/[^0-9]/g, "")) || 0;
                             setEditedSubtasks(copy);
                           }}
                           placeholder="Minutes"
                           keyboardType="numeric"
                         />
 
-                        <View
-                          style={[styles.input, { justifyContent: "center" }]}
-                        >
-                          <Text style={{ color: COLORS.text }}>
-                            XP:{" "}
-                            {st.suggestedXp ||
-                              computeXpPreview(st.estimatedMinutes)}
-                          </Text>
+                        <View style={[styles.input, { justifyContent: "center" }]}> 
+                          <Text style={{ color: COLORS.text }}>XP: {st.suggestedXp || computeXpPreview(st.estimatedMinutes)}</Text>
                         </View>
                       </View>
                     </View>
@@ -869,25 +958,9 @@ import api from "../services/api";
                 onPress={async () => {
                   try {
                     if (!currentAiTaskId) return;
-                    const body = {
-                      subtasks: editedSubtasks.map((s) => ({
-                        title: s.title,
-                        description: s.description,
-                        estimatedMinutes: s.estimatedMinutes,
-                        suggestedXp: s.suggestedXp,
-                      })),
-                      applyXp: true,
-                    };
-                    const resp = await api.tasks.acceptBreakdown(
-                      currentAiTaskId,
-                      body
-                    );
-                    Alert.alert(
-                      "Success",
-                      `Created ${
-                        resp.subtasks?.length || 0
-                      } subtasks. XP awarded: ${resp.xpAwarded || 0}`
-                    );
+                    const body = { subtasks: editedSubtasks.map(s => ({ title: s.title, description: s.description, estimatedMinutes: s.estimatedMinutes, suggestedXp: s.suggestedXp })), applyXp: true };
+                    const resp = await api.tasks.acceptBreakdown(currentAiTaskId, body);
+                    Alert.alert("Success", `Created ${resp.subtasks?.length || 0} subtasks. XP awarded: ${resp.xpAwarded || 0}`);
                     setAiModalVisible(false);
                     setEditedSubtasks([]);
                     setAiResult(null);
@@ -895,10 +968,7 @@ import api from "../services/api";
                     await fetchTasks();
                   } catch (e: any) {
                     console.error("Accept AI breakdown failed", e);
-                    Alert.alert(
-                      "Error",
-                      e.message || "Failed to create subtasks"
-                    );
+                    Alert.alert("Error", e.message || "Failed to create subtasks");
                   }
                 }}
               >
@@ -938,7 +1008,7 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     marginTop: 4,
   },
-
+  
   headerActions: {
     flexDirection: "row",
     gap: SPACING.s,
@@ -1123,14 +1193,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.03)",
     marginRight: SPACING.s,
   },
-  deleteTaskButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#EF444420",
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1140,8 +1202,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopLeftRadius: RADIUS.l,
     borderTopRightRadius: RADIUS.l,
-    height: "95%",
-    flexDirection: "column",
+    maxHeight: "85%",
+    minHeight: "50%",
   },
   modalHeader: {
     flexDirection: "row",
