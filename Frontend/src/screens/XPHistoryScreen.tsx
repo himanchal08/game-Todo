@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
 import { COLORS, SPACING, RADIUS } from "../theme";
+import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
@@ -26,6 +27,7 @@ interface XPEntry {
 }
 
 const XPHistoryScreen = () => {
+  const navigation: any = useNavigation();
   const [xpHistory, setXpHistory] = useState<XPEntry[]>([]);
   const [totalXP, setTotalXP] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,6 +60,13 @@ const XPHistoryScreen = () => {
   useEffect(() => {
     fetchXPHistory();
   }, []);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: COLORS.background, shadowColor: "transparent", elevation: 0 },
+      headerTintColor: COLORS.text,
+    });
+  }, [navigation]);
 
   const getSourceIcon = (source: string) => {
     const icons: { [key: string]: string } = {
