@@ -54,9 +54,23 @@ app.use(errorHandler);
 
 // Start server - Listen on all network interfaces (0.0.0.0)
 app.listen(PORT, "0.0.0.0", () => {
+  // Auto-detect network IP
+  const os = require("os");
+  const networkInterfaces = os.networkInterfaces();
+  let networkIP = "localhost";
+
+  // Find the first non-internal IPv4 address
+  Object.keys(networkInterfaces).forEach((interfaceName) => {
+    networkInterfaces[interfaceName].forEach((iface: any) => {
+      if (iface.family === "IPv4" && !iface.internal) {
+        networkIP = iface.address;
+      }
+    });
+  });
+
   console.log(`🚀 Server running on:`);
   console.log(`   - Local:   http://localhost:${PORT}`);
-  console.log(`   - Network: http://192.168.1.11:${PORT}`);
+  console.log(`   - Network: http://${networkIP}:${PORT}`);
   console.log(`📚 API Docs: http://localhost:${PORT}/health`);
 
   // Start cleanup scheduler

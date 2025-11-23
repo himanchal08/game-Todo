@@ -218,8 +218,8 @@ const NotificationsScreen = () => {
         </View>
       </View>
 
-      {notifications.length > 0 && unreadCount > 0 && (
-        <View style={styles.actionBar}>
+      <View style={styles.actionBar}>
+        {notifications.length > 0 && unreadCount > 0 && (
           <TouchableOpacity
             style={styles.markAllButton}
             onPress={handleMarkAllAsRead}
@@ -227,8 +227,34 @@ const NotificationsScreen = () => {
             <Ionicons name="checkmark-done" size={18} color={COLORS.primary} />
             <Text style={styles.markAllButtonText}>Mark All as Read</Text>
           </TouchableOpacity>
-        </View>
-      )}
+        )}
+        <TouchableOpacity
+          style={[
+            styles.markAllButton,
+            { backgroundColor: `${COLORS.success}20` },
+          ]}
+          onPress={async () => {
+            try {
+              await api.notifications.testMotivation();
+              Alert.alert(
+                "Success",
+                "Test notification sent! Pull down to refresh."
+              );
+              setTimeout(() => fetchNotifications(), 500);
+            } catch (error: any) {
+              Alert.alert(
+                "Error",
+                error.message || "Failed to send test notification"
+              );
+            }
+          }}
+        >
+          <Ionicons name="flask" size={18} color={COLORS.success} />
+          <Text style={[styles.markAllButtonText, { color: COLORS.success }]}>
+            Send Test
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         style={styles.scrollView}

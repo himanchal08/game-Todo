@@ -1,7 +1,36 @@
 import { supabase } from "./supabase";
+import Constants from "expo-constants";
 
-// Get API URL from environment
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
+// Automatically detect API URL
+const getApiUrl = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+
+  // Always prefer the explicit .env URL if set (for development)
+  if (envUrl) {
+    console.log("🌐 Using configured API URL:", envUrl);
+    return envUrl;
+  }
+
+  // In development without .env, use the same host as Metro bundler
+  const { manifest } = Constants;
+
+  // @ts-ignore - accessing debuggerHost for Metro URL
+  const debuggerHost = manifest?.debuggerHost || manifest?.hostUri;
+
+  if (debuggerHost) {
+    // Extract IP from Metro bundler URL (e.g., "192.168.1.10:8081")
+    const host = debuggerHost.split(":")[0];
+    const apiUrl = `http://${host}:3000`;
+    console.log("🌐 Auto-detected API URL from Metro:", apiUrl);
+    return apiUrl;
+  }
+
+  // Fallback to localhost
+  console.log("⚠️ Using localhost fallback");
+  return "http://localhost:3000";
+};
+
+const API_URL = getApiUrl();
 
 // Helper to get auth token
 const getAuthToken = async (): Promise<string | null> => {
