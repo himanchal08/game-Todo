@@ -391,18 +391,20 @@ const HabitsScreen = ({ navigation }: any) => {
             </ScrollView>
 
             <View style={styles.modalButtons}>
-              <BouncyButton
+              <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => setModalVisible(false)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
-              </BouncyButton>
-              <BouncyButton
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.createButton}
                 onPress={handleCreateHabit}
+                activeOpacity={0.7}
               >
                 <Text style={styles.createButtonText}>Create Habit</Text>
-              </BouncyButton>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -506,13 +508,14 @@ const HabitsScreen = ({ navigation }: any) => {
             </ScrollView>
 
             <View style={styles.modalButtons}>
-              <BouncyButton
+              <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => setAiModalVisible(false)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
-              </BouncyButton>
-              <BouncyButton
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.createButton}
                 onPress={async () => {
                   try {
@@ -548,7 +551,7 @@ const HabitsScreen = ({ navigation }: any) => {
                 }}
               >
                 <Text style={styles.createButtonText}>Create Tasks</Text>
-              </BouncyButton>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -758,6 +761,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.m,
     backgroundColor: COLORS.background,
     alignItems: "center",
+    justifyContent: "center",
   },
   cancelButtonText: {
     color: COLORS.text,
@@ -770,6 +774,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.m,
     backgroundColor: COLORS.primary,
     alignItems: "center",
+    justifyContent: "center",
   },
   createButtonText: {
     color: "#FFF",
