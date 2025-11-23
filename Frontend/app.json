@@ -46,8 +46,7 @@
       ],
       "package": "com.anonymous.Frontend",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Disciplo_Logo.png",
-        "monochromeImage": "./assets/Disciplo_Logo.png",
+        "foregroundImage": "./assets/playstore.png",
         "backgroundColor": "#1E293B"
       }
     },
