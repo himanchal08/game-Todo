@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -31,6 +31,7 @@ interface Profile {
 }
 
 const HomeScreen = () => {
+  const navigation = useNavigation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,12 +62,14 @@ const HomeScreen = () => {
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    // Photo verification is mandatory - redirect to Tasks screen
-    Alert.alert(
-      "Photo Proof Required 📸",
-      "To complete this task, you need to take a proof photo. This helps verify your progress!\n\nPlease go to the Tasks screen to complete this task with photo proof.",
-      [{ text: "OK", style: "default" }]
-    );
+    // Navigate directly to ProofUpload screen with the task
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      (navigation as any).navigate("ProofUpload", {
+        taskId: task.id,
+        taskTitle: task.title,
+      });
+    }
   };
 
   const handleClearCompleted = async () => {
@@ -93,7 +96,7 @@ const HomeScreen = () => {
           onPress: async () => {
             try {
               await api.tasks.deleteCompleted();
-              await fetchTodayTasks();
+              await Promise.all([fetchTodayTasks(), fetchProfile()]);
               Alert.alert("Success", "Completed tasks deleted successfully!");
             } catch (error: any) {
               console.error("Error deleting completed tasks:", error);

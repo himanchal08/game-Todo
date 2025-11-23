@@ -52,10 +52,12 @@ const AnalyticsScreen = () => {
 
   const fetchStats = async () => {
     try {
+      console.log("📈 Fetching analytics stats...");
       const response = await analyticsService.getStats();
+      console.log("📈 Analytics Response:", response);
       setStats(response.stats || response);
     } catch (error: any) {
-      console.error("Error fetching stats:", error);
+      console.error("❌ Error fetching stats:", error);
     }
   };
 

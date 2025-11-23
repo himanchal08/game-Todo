@@ -35,7 +35,9 @@ const XPHistoryScreen = () => {
 
   const fetchXPHistory = async () => {
     try {
+      console.log("📊 Fetching XP history...");
       const response = await api.xp.getHistory();
+      console.log("📊 XP History Response:", response);
       setXpHistory(response.history || []);
 
       const total = (response.history || []).reduce(
@@ -43,8 +45,14 @@ const XPHistoryScreen = () => {
         0
       );
       setTotalXP(total);
+      console.log(
+        "📊 Total XP:",
+        total,
+        "Entries:",
+        response.history?.length || 0
+      );
     } catch (error: any) {
-      console.error("Error fetching XP history:", error);
+      console.error("❌ Error fetching XP history:", error);
       Alert.alert("Error", error.message || "Failed to fetch XP history");
     } finally {
       setLoading(false);

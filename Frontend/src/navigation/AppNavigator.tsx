@@ -34,7 +34,7 @@ const TabNavigator = () => {
         headerShown: false,
       }}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Dashboard" component={HomeScreen} />
       <Tab.Screen name="Habits" component={HabitsScreen} />
       <Tab.Screen name="Create" component={TasksScreen} />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} />

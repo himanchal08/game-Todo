@@ -76,10 +76,13 @@ const ProfileScreen = ({ navigation: screenNavigation }: any) => {
 
   const fetchStreaks = async () => {
     try {
+      console.log("🔥 Fetching streaks...");
       const response = await api.streaks.getAll();
+      console.log("🔥 Streaks Response:", response);
       setStreaks(response.streaks || []);
+      console.log("🔥 Streaks Count:", response.streaks?.length || 0);
     } catch (error: any) {
-      console.error("Error fetching streaks:", error);
+      console.error("❌ Error fetching streaks:", error);
     }
   };
 

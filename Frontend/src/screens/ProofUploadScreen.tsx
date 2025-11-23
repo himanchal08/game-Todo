@@ -12,7 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
-import { proofsService } from "../services/api";
+import api, { proofsService } from "../services/api";
 import { BouncyButton } from "../components/ui";
 import { COLORS, SPACING, RADIUS } from "../theme";
 
@@ -75,21 +75,40 @@ const ProofUploadScreen = ({ navigation, route }: any) => {
 
     setUploading(true);
     try {
-      const data = await proofsService.upload(taskId, image);
+      // Upload proof first
+      const proofData = await proofsService.upload(taskId, image);
+
+      // Then complete the task
+      const completeData = await api.tasks.complete(taskId);
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      Alert.alert(
-        "Proof Accepted! 🎉",
-        `Great job! You earned +${
-          data.proof?.xp_bonus || data.xpBonus || 0
-        } Bonus XP!`,
-        [
-          {
-            text: "Awesome!",
-            onPress: () => navigation.goBack(),
+      const totalXP = (completeData.xpAwarded || 0) + (proofData.xpBonus || 0);
+      let message = `Task completed! +${totalXP} XP earned!\n📸 Photo saved!`;
+
+      if (completeData.newLevel) {
+        message += `\n🎉 Level Up! You're now level ${completeData.newLevel}!`;
+      }
+      if (completeData.newBadges && completeData.newBadges.length > 0) {
+        message += `\n🏆 New Badge: ${completeData.newBadges
+          .map((b: any) => b.name)
+          .join(", ")}`;
+      }
+      if (proofData.xpBonus) {
+        message += `\n📸 Proof Bonus: +${proofData.xpBonus} XP!`;
+      }
+
+      Alert.alert("Success! ✅", message, [
+        {
+          text: "Awesome!",
+          onPress: () => {
+            // Small delay to ensure backend has finished all operations
+            setTimeout(() => {
+              navigation.goBack();
+            }, 100);
           },
-        ]
-      );
+        },
+      ]);
     } catch (error: any) {
       console.error("Upload error:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
