@@ -4,6 +4,7 @@ import {
   getTodayTasks,
   completeTask,
   getTasksByHabit,
+  deleteTask,
   deleteCompletedTasks,
   aiBreakdown,
   acceptAiBreakdown,
@@ -20,6 +21,7 @@ router.post("/:id/complete", completeTask);
 router.post("/:id/breakdown", aiBreakdown);
 router.post("/:id/breakdown/accept", acceptAiBreakdown);
 router.get("/habit/:habitId", getTasksByHabit);
+router.delete("/:id", deleteTask);
 router.delete("/completed", deleteCompletedTasks);
 
 export default router;

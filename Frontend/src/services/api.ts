@@ -190,11 +190,17 @@ export const habitsAPI = {
 
     return response.json();
   },
-  breakdown: async (habitId: string, params: { maxParts?: number; targetTimeMinutes?: number } = {}) => {
-    const response = await authenticatedFetch(`/api/habits/${habitId}/breakdown`, {
-      method: "POST",
-      body: JSON.stringify(params),
-    });
+  breakdown: async (
+    habitId: string,
+    params: { maxParts?: number; targetTimeMinutes?: number } = {}
+  ) => {
+    const response = await authenticatedFetch(
+      `/api/habits/${habitId}/breakdown`,
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -204,11 +210,17 @@ export const habitsAPI = {
     return response.json();
   },
 
-  acceptBreakdown: async (habitId: string, body: { subtasks: any[]; applyXp?: boolean }) => {
-    const response = await authenticatedFetch(`/api/habits/${habitId}/breakdown/accept`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+  acceptBreakdown: async (
+    habitId: string,
+    body: { subtasks: any[]; applyXp?: boolean }
+  ) => {
+    const response = await authenticatedFetch(
+      `/api/habits/${habitId}/breakdown/accept`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -278,11 +290,17 @@ export const tasksAPI = {
     return response.json();
   },
 
-  breakdown: async (taskId: string, params: { maxParts?: number; targetTimeMinutes?: number } = {}) => {
-    const response = await authenticatedFetch(`/api/tasks/${taskId}/breakdown`, {
-      method: "POST",
-      body: JSON.stringify(params),
-    });
+  breakdown: async (
+    taskId: string,
+    params: { maxParts?: number; targetTimeMinutes?: number } = {}
+  ) => {
+    const response = await authenticatedFetch(
+      `/api/tasks/${taskId}/breakdown`,
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -292,15 +310,34 @@ export const tasksAPI = {
     return response.json();
   },
 
-  acceptBreakdown: async (taskId: string, body: { subtasks: any[]; applyXp?: boolean }) => {
-    const response = await authenticatedFetch(`/api/tasks/${taskId}/breakdown/accept`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+  acceptBreakdown: async (
+    taskId: string,
+    body: { subtasks: any[]; applyXp?: boolean }
+  ) => {
+    const response = await authenticatedFetch(
+      `/api/tasks/${taskId}/breakdown/accept`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || "Failed to accept AI breakdown");
+    }
+
+    return response.json();
+  },
+
+  delete: async (taskId: string) => {
+    const response = await authenticatedFetch(`/api/tasks/${taskId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to delete task");
     }
 
     return response.json();

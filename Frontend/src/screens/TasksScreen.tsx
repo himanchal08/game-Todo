@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -46,6 +46,9 @@ const TasksScreen = ({ route }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [proofModalVisible, setProofModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
+  const modalScrollRef = useRef<ScrollView>(null);
+  const proofModalScrollRef = useRef<ScrollView>(null);
+  const aiModalScrollRef = useRef<ScrollView>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<any | null>(null);
   const [editedSubtasks, setEditedSubtasks] = useState<any[]>([]);
@@ -87,9 +90,47 @@ const TasksScreen = ({ route }: any) => {
   const computeXpPreview = (estimatedMinutes: number, difficultyScore = 5) => {
     const baseXPPerMinute = 0.2;
     const difficultyMultiplier = 1 + (difficultyScore - 5) / 5;
-    const raw = (estimatedMinutes || 0) * baseXPPerMinute * difficultyMultiplier;
+    const raw =
+      (estimatedMinutes || 0) * baseXPPerMinute * difficultyMultiplier;
     return Math.max(1, Math.round(raw));
   };
+
+  // Scroll modals to top when opened
+  useEffect(() => {
+    if (modalVisible) {
+      modalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      setTimeout(() => {
+        modalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      setTimeout(() => {
+        modalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 200);
+    }
+  }, [modalVisible]);
+
+  useEffect(() => {
+    if (proofModalVisible) {
+      proofModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      setTimeout(() => {
+        proofModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      setTimeout(() => {
+        proofModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 200);
+    }
+  }, [proofModalVisible]);
+
+  useEffect(() => {
+    if (aiModalVisible) {
+      aiModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      setTimeout(() => {
+        aiModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      setTimeout(() => {
+        aiModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 200);
+    }
+  }, [aiModalVisible]);
 
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
@@ -138,6 +179,30 @@ const TasksScreen = ({ route }: any) => {
           onPress: () => {
             setSelectedTaskId(taskId);
             setProofModalVisible(true);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
+    Alert.alert(
+      "Delete Task",
+      `Are you sure you want to delete "${taskTitle}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.tasks.delete(taskId);
+              await fetchTasks();
+              Alert.alert("Success", "Task deleted successfully!");
+            } catch (error: any) {
+              console.error("Error deleting task:", error);
+              Alert.alert("Error", error.message || "Failed to delete task");
+            }
           },
         },
       ]
@@ -330,7 +395,9 @@ const TasksScreen = ({ route }: any) => {
 
     const grouped = filteredTasks.reduce(
       (acc: { [key: string]: Task[] }, task) => {
-        const date = task.scheduled_for;
+        // Use scheduled_for or fallback to today's date if missing
+        const date =
+          task.scheduled_for || new Date().toISOString().split("T")[0];
         if (!acc[date]) {
           acc[date] = [];
         }
@@ -346,7 +413,11 @@ const TasksScreen = ({ route }: any) => {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "No Date";
+
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Invalid Date";
+
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -390,7 +461,6 @@ const TasksScreen = ({ route }: any) => {
           </View>
         </View>
       </View>
-      
 
       {/* Habit Filter */}
       <ScrollView
@@ -565,25 +635,54 @@ const TasksScreen = ({ route }: any) => {
                           try {
                             setAiLoading(true);
                             setCurrentAiTaskId(task.id);
-                            const resp = await api.tasks.breakdown(task.id, { maxParts: 6 });
+                            const resp = await api.tasks.breakdown(task.id, {
+                              maxParts: 6,
+                            });
                             setAiResult(resp);
-                            const subs = (resp.subtasks || []).map((s: any) => ({
-                              title: s.title || "",
-                              description: s.description || "",
-                              estimatedMinutes: s.estimatedMinutes || s.estimated_minutes || 10,
-                              suggestedXp: s.suggestedXp || s.suggested_xp || s.suggestedXp || 0,
-                            }));
+                            const subs = (resp.subtasks || []).map(
+                              (s: any) => ({
+                                title: s.title || "",
+                                description: s.description || "",
+                                estimatedMinutes:
+                                  s.estimatedMinutes ||
+                                  s.estimated_minutes ||
+                                  10,
+                                suggestedXp:
+                                  s.suggestedXp ||
+                                  s.suggested_xp ||
+                                  s.suggestedXp ||
+                                  0,
+                              })
+                            );
                             setEditedSubtasks(subs);
                             setAiModalVisible(true);
                           } catch (e: any) {
                             console.error("AI breakdown failed", e);
-                            Alert.alert("Error", e.message || "AI breakdown failed");
+                            Alert.alert(
+                              "Error",
+                              e.message || "AI breakdown failed"
+                            );
                           } finally {
                             setAiLoading(false);
                           }
                         }}
                       >
-                        <Ionicons name="bulb-outline" size={20} color={COLORS.primary} />
+                        <Ionicons
+                          name="bulb-outline"
+                          size={20}
+                          color={COLORS.primary}
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.deleteTaskButton}
+                        onPress={() => handleDeleteTask(task.id, task.title)}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={20}
+                          color="#EF4444"
+                        />
                       </TouchableOpacity>
 
                       <Ionicons
@@ -618,12 +717,15 @@ const TasksScreen = ({ route }: any) => {
             </View>
 
             <ScrollView
+              ref={modalScrollRef}
               style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <Text style={[styles.inputLabel, styles.firstInputLabel]}>Task Title *</Text>
+              <Text style={[styles.inputLabel, styles.firstInputLabel]}>
+                Task Title *
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter task title"
@@ -774,7 +876,7 @@ const TasksScreen = ({ route }: any) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
+            <ScrollView ref={proofModalScrollRef} style={styles.modalScroll}>
               <View style={styles.proofInfo}>
                 <Ionicons
                   name="information-circle"
@@ -880,9 +982,15 @@ const TasksScreen = ({ route }: any) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+            <ScrollView
+              ref={aiModalScrollRef}
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+            >
               {aiLoading && (
-                <Text style={{ color: COLORS.textMuted }}>Generating suggestions...</Text>
+                <Text style={{ color: COLORS.textMuted }}>
+                  Generating suggestions...
+                </Text>
               )}
 
               {!aiLoading && aiResult && (
@@ -890,7 +998,9 @@ const TasksScreen = ({ route }: any) => {
                   {aiResult.aiSummary ? (
                     <View style={{ marginBottom: SPACING.m }}>
                       <Text style={[styles.inputLabel]}>AI Summary</Text>
-                      <Text style={{ color: COLORS.textLight }}>{aiResult.aiSummary}</Text>
+                      <Text style={{ color: COLORS.textLight }}>
+                        {aiResult.aiSummary}
+                      </Text>
                     </View>
                   ) : null}
 
@@ -898,7 +1008,9 @@ const TasksScreen = ({ route }: any) => {
 
                   {editedSubtasks.map((st, idx) => (
                     <View key={idx} style={{ marginBottom: SPACING.m }}>
-                      <Text style={{ fontWeight: "600", color: COLORS.text }}>Step {idx + 1}</Text>
+                      <Text style={{ fontWeight: "600", color: COLORS.text }}>
+                        Step {idx + 1}
+                      </Text>
                       <TextInput
                         style={styles.input}
                         value={st.title}
@@ -929,15 +1041,22 @@ const TasksScreen = ({ route }: any) => {
                           value={String(st.estimatedMinutes)}
                           onChangeText={(text) => {
                             const copy = [...editedSubtasks];
-                            copy[idx].estimatedMinutes = Number(text.replace(/[^0-9]/g, "")) || 0;
+                            copy[idx].estimatedMinutes =
+                              Number(text.replace(/[^0-9]/g, "")) || 0;
                             setEditedSubtasks(copy);
                           }}
                           placeholder="Minutes"
                           keyboardType="numeric"
                         />
 
-                        <View style={[styles.input, { justifyContent: "center" }]}> 
-                          <Text style={{ color: COLORS.text }}>XP: {st.suggestedXp || computeXpPreview(st.estimatedMinutes)}</Text>
+                        <View
+                          style={[styles.input, { justifyContent: "center" }]}
+                        >
+                          <Text style={{ color: COLORS.text }}>
+                            XP:{" "}
+                            {st.suggestedXp ||
+                              computeXpPreview(st.estimatedMinutes)}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -958,9 +1077,25 @@ const TasksScreen = ({ route }: any) => {
                 onPress={async () => {
                   try {
                     if (!currentAiTaskId) return;
-                    const body = { subtasks: editedSubtasks.map(s => ({ title: s.title, description: s.description, estimatedMinutes: s.estimatedMinutes, suggestedXp: s.suggestedXp })), applyXp: true };
-                    const resp = await api.tasks.acceptBreakdown(currentAiTaskId, body);
-                    Alert.alert("Success", `Created ${resp.subtasks?.length || 0} subtasks. XP awarded: ${resp.xpAwarded || 0}`);
+                    const body = {
+                      subtasks: editedSubtasks.map((s) => ({
+                        title: s.title,
+                        description: s.description,
+                        estimatedMinutes: s.estimatedMinutes,
+                        suggestedXp: s.suggestedXp,
+                      })),
+                      applyXp: true,
+                    };
+                    const resp = await api.tasks.acceptBreakdown(
+                      currentAiTaskId,
+                      body
+                    );
+                    Alert.alert(
+                      "Success",
+                      `Created ${
+                        resp.subtasks?.length || 0
+                      } subtasks. XP awarded: ${resp.xpAwarded || 0}`
+                    );
                     setAiModalVisible(false);
                     setEditedSubtasks([]);
                     setAiResult(null);
@@ -968,7 +1103,10 @@ const TasksScreen = ({ route }: any) => {
                     await fetchTasks();
                   } catch (e: any) {
                     console.error("Accept AI breakdown failed", e);
-                    Alert.alert("Error", e.message || "Failed to create subtasks");
+                    Alert.alert(
+                      "Error",
+                      e.message || "Failed to create subtasks"
+                    );
                   }
                 }}
               >
@@ -1008,7 +1146,7 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     marginTop: 4,
   },
-  
+
   headerActions: {
     flexDirection: "row",
     gap: SPACING.s,
@@ -1193,6 +1331,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.03)",
     marginRight: SPACING.s,
   },
+  deleteTaskButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#EF444420",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1202,8 +1348,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopLeftRadius: RADIUS.l,
     borderTopRightRadius: RADIUS.l,
-    maxHeight: "85%",
-    minHeight: "50%",
+    height: "95%",
+    flexDirection: "column",
   },
   modalHeader: {
     flexDirection: "row",

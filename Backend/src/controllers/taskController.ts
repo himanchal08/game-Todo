@@ -223,7 +223,9 @@ export const aiBreakdown = async (req: AuthRequest, res: Response) => {
     return res.json({ taskId: id, ...aiResult });
   } catch (error: any) {
     console.error("AI breakdown error:", error);
-    return res.status(500).json({ error: error.message || "AI breakdown failed" });
+    return res
+      .status(500)
+      .json({ error: error.message || "AI breakdown failed" });
   }
 };
 
@@ -296,7 +298,10 @@ export const acceptAiBreakdown = async (req: AuthRequest, res: Response) => {
         console.error("Error inserting xp logs:", xpErr);
         // proceed but inform user
       } else {
-        xpAwarded = (xpInserted || []).reduce((s: number, x: any) => s + (x.amount || 0), 0);
+        xpAwarded = (xpInserted || []).reduce(
+          (s: number, x: any) => s + (x.amount || 0),
+          0
+        );
 
         // Update profile total_xp and level
         const { data: profile, error: profileErr } = await supabaseAdmin
@@ -329,7 +334,9 @@ export const acceptAiBreakdown = async (req: AuthRequest, res: Response) => {
     return res.status(201).json({ subtasks: inserted, xpAwarded });
   } catch (error: any) {
     console.error("acceptAiBreakdown error:", error);
-    return res.status(500).json({ error: error.message || "Failed to accept AI breakdown" });
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to accept AI breakdown" });
   }
 };
 
@@ -351,6 +358,29 @@ export const getTasksByHabit = async (req: AuthRequest, res: Response) => {
     }
 
     res.json({ tasks: data });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteTask = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    // Use admin client to bypass RLS
+    const { error } = await supabaseAdmin
+      .from("tasks")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Delete task error:", error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ message: "Task deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

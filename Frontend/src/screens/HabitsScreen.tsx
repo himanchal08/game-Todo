@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,8 @@ const HabitsScreen = ({ navigation }: any) => {
   const [streaks, setStreaks] = useState<Streak[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
+  const modalScrollRef = useRef<ScrollView>(null);
+  const aiModalScrollRef = useRef<ScrollView>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<any | null>(null);
   const [editedSubtasks, setEditedSubtasks] = useState<any[]>([]);
@@ -74,6 +76,31 @@ const HabitsScreen = ({ navigation }: any) => {
     }
   };
 
+  // Scroll modals to top when opened
+  useEffect(() => {
+    if (modalVisible) {
+      modalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      setTimeout(() => {
+        modalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      setTimeout(() => {
+        modalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 200);
+    }
+  }, [modalVisible]);
+
+  useEffect(() => {
+    if (aiModalVisible) {
+      aiModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      setTimeout(() => {
+        aiModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      setTimeout(() => {
+        aiModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 200);
+    }
+  }, [aiModalVisible]);
+
   const handleCreateHabit = async () => {
     if (!newHabit.name.trim()) {
       Alert.alert("Error", "Please enter a habit name");
@@ -102,6 +129,30 @@ const HabitsScreen = ({ navigation }: any) => {
       console.error("Error creating habit:", error);
       Alert.alert("Error", error.message || "Failed to create habit");
     }
+  };
+
+  const handleDeleteHabit = async (habitId: string, habitName: string) => {
+    Alert.alert(
+      "Delete Habit",
+      `Are you sure you want to delete "${habitName}"? This will also delete all associated tasks.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await habitsService.delete(habitId);
+              await fetchHabits();
+              Alert.alert("Success", "Habit deleted successfully!");
+            } catch (error: any) {
+              console.error("Error deleting habit:", error);
+              Alert.alert("Error", error.message || "Failed to delete habit");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const onRefresh = async () => {
@@ -162,12 +213,15 @@ const HabitsScreen = ({ navigation }: any) => {
                   try {
                     setAiLoading(true);
                     setCurrentAiHabitId(item.id);
-                    const resp = await habitsService.breakdown(item.id, { maxParts: 6 });
+                    const resp = await habitsService.breakdown(item.id, {
+                      maxParts: 6,
+                    });
                     setAiResult(resp);
                     const subs = (resp.subtasks || []).map((s: any) => ({
                       title: s.title || "",
                       description: s.description || "",
-                      estimatedMinutes: s.estimatedMinutes || s.estimated_minutes || 10,
+                      estimatedMinutes:
+                        s.estimatedMinutes || s.estimated_minutes || 10,
                       suggestedXp: s.suggestedXp || s.suggested_xp || 0,
                     }));
                     setEditedSubtasks(subs);
@@ -180,7 +234,21 @@ const HabitsScreen = ({ navigation }: any) => {
                   }
                 }}
               >
-                <Ionicons name="bulb-outline" size={20} color={COLORS.primary} />
+                <Ionicons
+                  name="bulb-outline"
+                  size={20}
+                  color={COLORS.primary}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteHabit(item.id, habitName);
+                }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
               </TouchableOpacity>
 
               <Ionicons
@@ -253,10 +321,16 @@ const HabitsScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              ref={modalScrollRef}
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: SPACING.m }}
+            >
+              <Text style={styles.label}>Habit Name *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Habit Name"
+                placeholder="Enter habit name"
                 placeholderTextColor={COLORS.textLight}
                 value={newHabit.name}
                 onChangeText={(text) =>
@@ -264,9 +338,10 @@ const HabitsScreen = ({ navigation }: any) => {
                 }
               />
 
+              <Text style={styles.label}>Description</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Description (optional)"
+                placeholder="Enter description (optional)"
                 placeholderTextColor={COLORS.textLight}
                 value={newHabit.description}
                 onChangeText={(text) =>
@@ -349,22 +424,35 @@ const HabitsScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {aiLoading && <Text style={{ color: COLORS.textMuted }}>Generating suggestions...</Text>}
+            <ScrollView
+              ref={aiModalScrollRef}
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: SPACING.m }}
+            >
+              {aiLoading && (
+                <Text style={{ color: COLORS.textMuted }}>
+                  Generating suggestions...
+                </Text>
+              )}
 
               {!aiLoading && aiResult && (
                 <View>
                   {aiResult.aiSummary ? (
                     <View style={{ marginBottom: SPACING.m }}>
                       <Text style={styles.label}>AI Summary</Text>
-                      <Text style={{ color: COLORS.textLight }}>{aiResult.aiSummary}</Text>
+                      <Text style={{ color: COLORS.textLight }}>
+                        {aiResult.aiSummary}
+                      </Text>
                     </View>
                   ) : null}
 
                   <Text style={styles.label}>Suggested Tasks</Text>
                   {editedSubtasks.map((st, idx) => (
                     <View key={idx} style={{ marginBottom: SPACING.m }}>
-                      <Text style={{ fontWeight: "600", color: COLORS.text }}>Step {idx + 1}</Text>
+                      <Text style={{ fontWeight: "600", color: COLORS.text }}>
+                        Step {idx + 1}
+                      </Text>
                       <TextInput
                         style={styles.input}
                         value={st.title}
@@ -395,15 +483,20 @@ const HabitsScreen = ({ navigation }: any) => {
                           value={String(st.estimatedMinutes)}
                           onChangeText={(text) => {
                             const copy = [...editedSubtasks];
-                            copy[idx].estimatedMinutes = Number(text.replace(/[^0-9]/g, "")) || 0;
+                            copy[idx].estimatedMinutes =
+                              Number(text.replace(/[^0-9]/g, "")) || 0;
                             setEditedSubtasks(copy);
                           }}
                           placeholder="Minutes"
                           keyboardType="numeric"
                         />
 
-                        <View style={[styles.input, { justifyContent: "center" }]}> 
-                          <Text style={{ color: COLORS.text }}>XP: {st.suggestedXp || 0}</Text>
+                        <View
+                          style={[styles.input, { justifyContent: "center" }]}
+                        >
+                          <Text style={{ color: COLORS.text }}>
+                            XP: {st.suggestedXp || 0}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -413,7 +506,10 @@ const HabitsScreen = ({ navigation }: any) => {
             </ScrollView>
 
             <View style={styles.modalButtons}>
-              <BouncyButton style={styles.cancelButton} onPress={() => setAiModalVisible(false)}>
+              <BouncyButton
+                style={styles.cancelButton}
+                onPress={() => setAiModalVisible(false)}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </BouncyButton>
               <BouncyButton
@@ -421,9 +517,25 @@ const HabitsScreen = ({ navigation }: any) => {
                 onPress={async () => {
                   try {
                     if (!currentAiHabitId) return;
-                    const body = { subtasks: editedSubtasks.map(s => ({ title: s.title, description: s.description, estimatedMinutes: s.estimatedMinutes, suggestedXp: s.suggestedXp })), applyXp: true };
-                    const resp = await habitsService.acceptBreakdown(currentAiHabitId, body);
-                    Alert.alert("Success", `Created ${resp.subtasks?.length || 0} tasks. XP awarded: ${resp.xpAwarded || 0}`);
+                    const body = {
+                      subtasks: editedSubtasks.map((s) => ({
+                        title: s.title,
+                        description: s.description,
+                        estimatedMinutes: s.estimatedMinutes,
+                        suggestedXp: s.suggestedXp,
+                      })),
+                      applyXp: true,
+                    };
+                    const resp = await habitsService.acceptBreakdown(
+                      currentAiHabitId,
+                      body
+                    );
+                    Alert.alert(
+                      "Success",
+                      `Created ${
+                        resp.subtasks?.length || 0
+                      } tasks. XP awarded: ${resp.xpAwarded || 0}`
+                    );
                     setAiModalVisible(false);
                     setEditedSubtasks([]);
                     setAiResult(null);
@@ -532,6 +644,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.03)",
     marginRight: SPACING.s,
   },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#EF444420",
+  },
   streakRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -572,7 +692,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     padding: SPACING.l,
-    maxHeight: "90%",
+    height: "85%",
+    flexDirection: "column",
   },
   modalHeader: {
     flexDirection: "row",
