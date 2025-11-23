@@ -185,6 +185,30 @@ const TasksScreen = ({ route }: any) => {
     );
   };
 
+  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
+    Alert.alert(
+      "Delete Task",
+      `Are you sure you want to delete "${taskTitle}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.tasks.delete(taskId);
+              await fetchTasks();
+              Alert.alert("Success", "Task deleted successfully!");
+            } catch (error: any) {
+              console.error("Error deleting task:", error);
+              Alert.alert("Error", error.message || "Failed to delete task");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const requestPermissions = async () => {
     try {
       const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
@@ -371,7 +395,9 @@ const TasksScreen = ({ route }: any) => {
 
     const grouped = filteredTasks.reduce(
       (acc: { [key: string]: Task[] }, task) => {
-        const date = task.scheduled_for;
+        // Use scheduled_for or fallback to today's date if missing
+        const date =
+          task.scheduled_for || new Date().toISOString().split("T")[0];
         if (!acc[date]) {
           acc[date] = [];
         }
@@ -645,6 +671,17 @@ const TasksScreen = ({ route }: any) => {
                           name="bulb-outline"
                           size={20}
                           color={COLORS.primary}
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.deleteTaskButton}
+                        onPress={() => handleDeleteTask(task.id, task.title)}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={20}
+                          color="#EF4444"
                         />
                       </TouchableOpacity>
 
@@ -1293,6 +1330,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.03)",
     marginRight: SPACING.s,
+  },
+  deleteTaskButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#EF444420",
   },
   modalOverlay: {
     flex: 1,

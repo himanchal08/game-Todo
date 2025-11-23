@@ -131,6 +131,30 @@ const HabitsScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleDeleteHabit = async (habitId: string, habitName: string) => {
+    Alert.alert(
+      "Delete Habit",
+      `Are you sure you want to delete "${habitName}"? This will also delete all associated tasks.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await habitsService.delete(habitId);
+              await fetchHabits();
+              Alert.alert("Success", "Habit deleted successfully!");
+            } catch (error: any) {
+              console.error("Error deleting habit:", error);
+              Alert.alert("Error", error.message || "Failed to delete habit");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchHabits(), fetchStreaks()]);
@@ -217,6 +241,16 @@ const HabitsScreen = ({ navigation }: any) => {
                 />
               </TouchableOpacity>
 
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteHabit(item.id, habitName);
+                }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              </TouchableOpacity>
+
               <Ionicons
                 name="chevron-forward"
                 size={20}
@@ -290,10 +324,13 @@ const HabitsScreen = ({ navigation }: any) => {
             <ScrollView
               ref={modalScrollRef}
               showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: SPACING.m }}
             >
+              <Text style={styles.label}>Habit Name *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Habit Name"
+                placeholder="Enter habit name"
                 placeholderTextColor={COLORS.textLight}
                 value={newHabit.name}
                 onChangeText={(text) =>
@@ -301,9 +338,10 @@ const HabitsScreen = ({ navigation }: any) => {
                 }
               />
 
+              <Text style={styles.label}>Description</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Description (optional)"
+                placeholder="Enter description (optional)"
                 placeholderTextColor={COLORS.textLight}
                 value={newHabit.description}
                 onChangeText={(text) =>
@@ -389,6 +427,8 @@ const HabitsScreen = ({ navigation }: any) => {
             <ScrollView
               ref={aiModalScrollRef}
               showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: SPACING.m }}
             >
               {aiLoading && (
                 <Text style={{ color: COLORS.textMuted }}>
@@ -603,6 +643,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.03)",
     marginRight: SPACING.s,
+  },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#EF444420",
   },
   streakRow: {
     flexDirection: "row",
