@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useIsFocused } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -34,6 +35,8 @@ const HomeScreen = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isFetchingRef = useRef(false);
+  const isFocused = useIsFocused();
 
   const fetchTodayTasks = async () => {
     try {
@@ -112,9 +115,41 @@ const HomeScreen = () => {
   };
 
   useEffect(() => {
-    fetchTodayTasks();
-    fetchProfile();
-  }, []);
+    let tasksInterval: any = null;
+    let profileInterval: any = null;
+
+    const startIntervals = async () => {
+      // initial fetch
+      await fetchTodayTasks();
+      await fetchProfile();
+
+      // tasks every 1 second (non-overlapping)
+      tasksInterval = setInterval(async () => {
+        if (isFetchingRef.current) return;
+        try {
+          isFetchingRef.current = true;
+          await fetchTodayTasks();
+        } finally {
+          isFetchingRef.current = false;
+        }
+      }, 1000);
+
+      // profile less frequently (every 5 seconds)
+      profileInterval = setInterval(() => {
+        fetchProfile();
+      }, 5000);
+    };
+
+    // only run intervals while the screen is focused
+    if (isFocused) {
+      startIntervals();
+    }
+
+    return () => {
+      if (tasksInterval) clearInterval(tasksInterval);
+      if (profileInterval) clearInterval(profileInterval);
+    };
+  }, [isFocused]);
 
   const calculateLevelProgress = () => {
     if (!profile) return 0;
