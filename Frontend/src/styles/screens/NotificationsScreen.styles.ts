@@ -17,6 +17,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: spacing.lg,
+    backgroundColor: "transparent",
   },
   title: {
     fontSize: typography.fontSize.xxl,

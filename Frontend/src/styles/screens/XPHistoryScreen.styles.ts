@@ -18,6 +18,7 @@ export default StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: spacing.lg,
+    backgroundColor: "transparent",
   },
   title: {
     fontSize: typography.fontSize.xxl,
