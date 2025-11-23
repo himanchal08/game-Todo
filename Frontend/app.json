@@ -19,9 +19,9 @@
       "androidCollapsedTitle": "#{unread_notifications} new notifications"
     },
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/Disciplo_Logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1E293B"
     },
     "ios": {
       "supportsTablet": true,
